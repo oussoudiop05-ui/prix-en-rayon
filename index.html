@@ -287,6 +287,17 @@ body:has(#view-cart:not([hidden]) .cartsum) .toast { bottom: calc(148px + env(sa
 .imp-top { display: flex; align-items: center; gap: 8px; }
 .imp-raw { flex: 1; min-width: 0; font-weight: 600; overflow-wrap: anywhere; }
 .imp select { min-height: 42px; }
+.refs { display: grid; gap: 8px; }
+.ref { display: grid; gap: 3px; width: 100%; text-align: left; padding: 10px 12px; border: 1.5px solid var(--line); border-radius: 10px; background: var(--field); color: var(--ink); font: inherit; cursor: pointer; }
+.ref.on { border-color: var(--accent); box-shadow: inset 0 0 0 1.5px var(--accent); background: var(--surface); }
+.ref.avoid { opacity: .75; }
+.ref-top { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+.ref-place { font-size: 16px; }
+.ref-main { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; flex-wrap: wrap; }
+.ref-unit { font: 700 20px/1.1 var(--font-num); }
+.ref-price { font-size: 15px; color: var(--muted); }
+.ref-sub { font-size: 13px; color: var(--muted); }
+.ref.on::before { content: '✓ Choisi'; font-size: 12px; font-weight: 700; color: var(--accent); letter-spacing: .04em; text-transform: uppercase; }
 
 
 .help-back { position: fixed; inset: 0; z-index: 35; background: var(--ink); opacity: .5; }
@@ -1235,11 +1246,12 @@ body:has(#view-cart:not([hidden]) .cartsum) .toast { bottom: calc(148px + env(sa
     if (imageParts) parts = imageParts.concat(parts);
     var body = JSON.stringify({
       contents: [{ role: 'user', parts: parts }],
-      generationConfig: { responseMimeType: 'application/json', maxOutputTokens: 8192 }
+      systemInstruction: { parts: [{ text: 'Tu es un assistant de courses et de tickets de caisse français, précis et rigoureux. Réponds uniquement avec un JSON valide respectant exactement le format demandé, sans texte autour. Corrige les mots mal reconnus à l\'oral d\'après le sens. N\'invente jamais de produit, de prix ni de quantité.' }] },
+      generationConfig: { responseMimeType: 'application/json', maxOutputTokens: 16384, temperature: 0 }
     });
     var used = '';
     return geminiModels(key, !!retried).then(function(m) {
-      used = withImg ? m.flash : m.lite;
+      used = m.flash;
       return fetch(GEMINI_BASE + 'models/' + used + ':generateContent?key=' + encodeURIComponent(key), {
         method: 'POST', headers: { 'Content-Type': 'application/json' }, body: body
       });
@@ -1248,20 +1260,20 @@ body:has(#view-cart:not([hidden]) .cartsum) .toast { bottom: calc(148px + env(sa
       if (r.status === 400) return r.json().then(function(e) { throw { code: 'invalid_request', message: e && e.error && e.error.message }; });
       if (r.status === 403 || r.status === 401) throw { code: 'not_granted' };
       if (r.status === 429) throw { code: 'rate_limited' };
-      if (!r.ok) throw { code: 'server_error', status: r.status };
+      if (!r.ok) { if (r.status >= 500 && !retried) return new Promise(function (ok) { setTimeout(function () { ok('retry'); }, 1500); }); throw { code: 'server_error', status: r.status }; }
       return r.json();
     }).then(function(data) {
       if (data === 'retry') return geminiRequest(prompt, imageParts, true);
       var cand = data && data.candidates && data.candidates[0];
       var ps = (cand && cand.content && cand.content.parts) || [];
       var text = ps.filter(function(p) { return p.text && !p.thought; }).map(function(p) { return p.text; }).join('');
-      if (!text) throw { code: 'empty_completion' };
+      if (!text) { if (!retried) return geminiRequest(prompt, imageParts, true); throw { code: 'empty_completion' }; }
       try {
         var cleaned = text.replace(/^\s*```(?:json)?\s*|\s*```\s*$/g, '').trim();
         var out = JSON.parse(cleaned);
         geminiLastModel = used;
         return out;
-      } catch (e2) { throw { code: 'invalid_json', text: text }; }
+      } catch (e2) { if (!retried) return geminiRequest(prompt, imageParts, true); throw { code: 'invalid_json', text: text }; }
     });
   }
   var geminiLastModel = '';
@@ -1882,12 +1894,22 @@ body:has(#view-cart:not([hidden]) .cartsum) .toast { bottom: calc(148px + env(sa
         ln.cands.map(function (x, j) { return '<option value="' + j + '"' + (j === ln.pi ? ' selected' : '') + '>' + esc(x.name) + '</option>'; }).join('') +
         '<option value="-1"' + (ln.pi < 0 ? ' selected' : '') + '>Aucun de ceux-là</option></select></div>';
       if (c) {
-        h += '<div class="field"><label for="ir' + i + '">Où l\'acheter</label><select id="ir' + i + '" class="imp-ref" data-i="' + i + '">' +
-          rankRefs(c.refs).map(function (r) {
-            var t = (r.place || 'lieu ?') + ' · ' + eur.format(r.price) + (r.unitPrice != null ? ' (' + eur.format(r.unitPrice) + '/' + GS[r.group] + ')' : '') + (r.verdict === 'buy' ? ' · à acheter' : r.verdict === 'avoid' ? ' · à éviter' : '');
-            return '<option value="' + esc(r.id) + '"' + (r.id === ln.ref ? ' selected' : '') + '>' + esc(t) + '</option>';
-          }).join('') + '</select></div>';
+        var rk = rankRefs(c.refs), cheapest = null;
+        rk.forEach(function (r) { if (r.unitPrice != null && r.verdict !== 'avoid' && (cheapest == null || r.unitPrice < cheapest)) cheapest = r.unitPrice; });
+        h += '<div class="field"><span class="lbl">Où l\'acheter · touchez pour choisir</span><div class="refs" role="radiogroup">' +
+          rk.map(function (r, j) {
+            var on = r.id === ln.ref, best = cheapest != null && r.unitPrice === cheapest && rk.length > 1;
+            return '<button type="button" class="ref' + (on ? ' on' : '') + (r.verdict === 'avoid' ? ' avoid' : '') + '" role="radio" aria-checked="' + on + '" data-act="imp-ref" data-i="' + i + '" data-id="' + esc(r.id) + '">' +
+              '<span class="ref-top"><b class="ref-place">' + esc(r.place || 'Lieu ?') + '</b>' +
+              (best ? '<span class="chip best">Moins cher au ' + esc(GS[r.group] || 'kg') + '</span>' : '') +
+              (r.verdict === 'buy' ? '<span class="chip">à acheter</span>' : r.verdict === 'avoid' ? '<span class="chip">à éviter</span>' : '') +
+              (r.promo ? '<span class="chip promo">promo</span>' : '') + '</span>' +
+              '<span class="ref-main"><span class="ref-unit">' + (r.unitPrice != null ? esc(eur.format(r.unitPrice)) + ' / ' + esc(GS[r.group] || 'kg') : '—') + '</span>' +
+              '<span class="ref-price">' + esc(eur.format(r.price)) + (r.qty != null ? ' · ' + esc(fmtQty(r)) : '') + '</span></span>' +
+              '<span class="ref-sub">' + esc([r.brand, r.date ? 'relevé le ' + fmtDate(r.date) : ''].filter(Boolean).join(' · ')) + '</span></button>';
+          }).join('') + '</div></div>';
         if (ln.off) h += '<p class="meta">Pas de relevé chez ' + esc(imp.store) + ' pour cet article : meilleur choix proposé.</p>';
+        if (c.refs.length > 1) h += '<p class="meta">Proposé par défaut : ' + (imp.store ? 'celui de ' + esc(imp.store) + ' s\'il existe, sinon ' : '') + 'le moins cher au ' + esc(GS[c.refs[0].group] || 'kg') + ' (« à acheter » avant, « à éviter » après).</p>';
         if (c.refs.length > 1 || ln.cands.length > 1) h += '<button type="button" class="linkbtn" data-act="imp-dup" data-i="' + i + '">+ Prendre aussi une autre référence</button>';
       } else {
         h += '<p class="meta">Mise au panier sans prix, à compléter.</p>';
@@ -1951,6 +1973,7 @@ body:has(#view-cart:not([hidden]) .cartsum) .toast { bottom: calc(148px + env(sa
     var b = e.target.closest('button[data-act]'); if (!b || !imp) return;
     var act = b.getAttribute('data-act'), i = parseInt(b.getAttribute('data-i'), 10);
     if (act === 'imp-store') { imp.store = b.getAttribute('data-place') || ''; imp.lines.forEach(function (ln) { if (ln.pi >= 0) setLineProduct(ln, ln.pi); }); renderImport(); }
+    else if (act === 'imp-ref') { var lnr = imp.lines[i]; lnr.ref = b.getAttribute('data-id'); lnr.off = false; renderImport(); }
     else if (act === 'imp-inc') { imp.lines[i].count = Math.min(99, imp.lines[i].count + 1); renderImport(); }
     else if (act === 'imp-dec') { imp.lines[i].count = Math.max(1, imp.lines[i].count - 1); renderImport(); }
     else if (act === 'imp-del') { imp.lines.splice(i, 1); renderImport(); }
@@ -2191,7 +2214,7 @@ body:has(#view-cart:not([hidden]) .cartsum) .toast { bottom: calc(148px + env(sa
   function refineReceipt() {
     if (!rc || rc.busy || !rc.parsed) return;
     var parsed = rc.parsed, keep = rc, list = productList();
-    rc.busy = true; rc.busyMsg = 'Claude affine les noms et les correspondances… (de 10 à 60 secondes)'; renderReceipt();
+    rc.busy = true; rc.busyMsg = 'Gemini affine les noms et les correspondances… (de 10 à 60 secondes)'; renderReceipt();
     sampleFn.json(refinePrompt(parsed, list), { cache: false }).then(function (r) {
       var by = {}; (r && Array.isArray(r.lines) ? r.lines : []).forEach(function (m) { if (m && Number.isInteger(m.i)) by[m.i] = m; });
       var base = localReply(parsed, list);
@@ -3501,7 +3524,7 @@ body:has(#view-cart:not([hidden]) .cartsum) .toast { bottom: calc(148px + env(sa
     if (vMode === 'cart') {
       vdBusy(true); vdNote('Gemini découpe la dictée… (quelques secondes)');
       var p = 'Voici la transcription d\'une dictée vocale de liste de courses en français. Elle peut contenir des mots mal reconnus : corrige-les d\'après le sens. Découpe-la en produits. Ignore les formules de commande et de destination (« ajoute », « mets », « à ma liste de courses », « au panier », « s\'il te plaît ») : ne garde que les noms de produits et les quantités. ' +
-        'Réponds uniquement avec un objet JSON {"items": [{"name": nom du produit, de préférence le nom exact d\'un produit de la LISTE s\'il correspond, "count": nombre d\'unités, entier, 1 par défaut}]}. N\'invente aucun produit.\n\nLISTE :\n' + listText(list) + '\n\nDICTÉE :\n' + text;
+        'Si l\'utilisateur dit un terme générique (« pâtes », « lait »), choisis le produit de la LISTE le plus courant qui correspond ; s\'il cite un produit précis, garde-le. Un produit absent de la LISTE est gardé tel que dicté (sans formule de commande). Réponds uniquement avec un objet JSON {"items": [{"name": nom du produit, de préférence le nom exact d\'un produit de la LISTE s\'il correspond, "count": nombre d\'unités, entier, 1 par défaut}]}. N\'invente aucun produit. Exemple : « ajoute deux packs de lait et des spaghettis à ma liste de courses » -> {"items":[{"name":"Lait demi écrémé","count":2},{"name":"Spaghetti","count":1}]}.\n\nLISTE :\n' + listText(list) + '\n\nDICTÉE :\n' + text;
       withTimeout(sampleFn.json(p, { modelTier: 'quick', cache: false }), 60000, 'timeout').then(function (r) {
         var lines = (r && Array.isArray(r.items) ? r.items : []).map(function (x) {
           var n = String(x && x.name || '').trim(), c = Math.min(Math.max(Math.round(Number(x && x.count) || 1), 1), 99);
