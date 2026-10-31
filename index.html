@@ -696,6 +696,7 @@ body:has(#view-cart:not([hidden]) .cartsum) .toast { bottom: calc(148px + env(sa
     </div>
     <div class="actions-row">
       <button type="button" class="btn primary small" id="set-gemini-save">💾 Enregistrer</button>
+      <button type="button" class="btn small" id="set-gemini-test">Tester</button>
       <button type="button" class="btn small" id="set-gemini-clear">Supprimer la clé</button>
     </div>
     <p class="scan-note" id="set-gemini-status" aria-live="polite" style="margin-top:6px"></p>
@@ -1191,35 +1192,79 @@ body:has(#view-cart:not([hidden]) .cartsum) .toast { bottom: calc(148px + env(sa
     try { return localStorage.getItem(GEMINI_KEY_SK) || ''; } catch(e) { return ''; }
   }
 
-  function geminiRequest(prompt, imageParts) {
+  // Détection automatique du meilleur modèle disponible pour la clé (les anciens modèles sont retirés par Google).
+  var GEMINI_BASE = 'https://generativelanguage.googleapis.com/v1beta/';
+  var GEMINI_MODELS_SK = 'prix-rayon-gemini-models';
+  function geminiPickModels(list) {
+    var best = { flash: null, lite: null };
+    (list || []).forEach(function(m) {
+      var id = String(m.name || '').replace(/^models\//, '');
+      var mt = /^gemini-(\d+(?:\.\d+)?)-flash(-lite)?$/.exec(id);
+      if (!mt) return;
+      if (m.supportedGenerationMethods && m.supportedGenerationMethods.indexOf('generateContent') < 0) return;
+      var v = parseFloat(mt[1]), kind = mt[2] ? 'lite' : 'flash';
+      if (!best[kind] || v > best[kind].v) best[kind] = { id: id, v: v };
+    });
+    var flash = best.flash && best.flash.id, lite = best.lite && best.lite.id;
+    if (!flash && !lite) return null;
+    return { flash: flash || lite, lite: lite || flash };
+  }
+  function geminiModels(key, force) {
+    if (!force) {
+      try {
+        var c = JSON.parse(localStorage.getItem(GEMINI_MODELS_SK) || 'null');
+        if (c && c.key === key.slice(-6) && Date.now() - c.t < 86400000 && c.m) return Promise.resolve(c.m);
+      } catch (e) {}
+    }
+    return fetch(GEMINI_BASE + 'models?pageSize=200&key=' + encodeURIComponent(key)).then(function(r) {
+      if (r.status === 400 || r.status === 401 || r.status === 403) throw { code: 'not_granted' };
+      if (!r.ok) throw { code: 'server_error', status: r.status };
+      return r.json();
+    }).then(function(d) {
+      var m = geminiPickModels(d && d.models);
+      if (!m) throw { code: 'no_model' };
+      try { localStorage.setItem(GEMINI_MODELS_SK, JSON.stringify({ key: key.slice(-6), t: Date.now(), m: m })); } catch (e) {}
+      return m;
+    });
+  }
+  function geminiRequest(prompt, imageParts, retried) {
     var key = getGeminiKey();
     if (!key) return Promise.reject({ code: 'no_key' });
-    var model = imageParts && imageParts.length ? 'gemini-2.0-flash' : 'gemini-2.0-flash-lite';
+    var withImg = !!(imageParts && imageParts.length);
     var parts = [{ text: prompt }];
     if (imageParts) parts = imageParts.concat(parts);
     var body = JSON.stringify({
       contents: [{ role: 'user', parts: parts }],
-      generationConfig: { responseMimeType: 'application/json', maxOutputTokens: 2048 }
+      generationConfig: { responseMimeType: 'application/json', maxOutputTokens: 8192 }
     });
-    return fetch('https://generativelanguage.googleapis.com/v1beta/models/' + model + ':generateContent?key=' + key, {
-      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: body
+    var used = '';
+    return geminiModels(key, !!retried).then(function(m) {
+      used = withImg ? m.flash : m.lite;
+      return fetch(GEMINI_BASE + 'models/' + used + ':generateContent?key=' + encodeURIComponent(key), {
+        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: body
+      });
     }).then(function(r) {
+      if (r.status === 404 && !retried) { try { localStorage.removeItem(GEMINI_MODELS_SK); } catch (e) {} return 'retry'; }
       if (r.status === 400) return r.json().then(function(e) { throw { code: 'invalid_request', message: e && e.error && e.error.message }; });
       if (r.status === 403 || r.status === 401) throw { code: 'not_granted' };
       if (r.status === 429) throw { code: 'rate_limited' };
       if (!r.ok) throw { code: 'server_error', status: r.status };
       return r.json();
     }).then(function(data) {
-      var text = data && data.candidates && data.candidates[0] && data.candidates[0].content &&
-                 data.candidates[0].content.parts && data.candidates[0].content.parts[0] &&
-                 data.candidates[0].content.parts[0].text;
+      if (data === 'retry') return geminiRequest(prompt, imageParts, true);
+      var cand = data && data.candidates && data.candidates[0];
+      var ps = (cand && cand.content && cand.content.parts) || [];
+      var text = ps.filter(function(p) { return p.text && !p.thought; }).map(function(p) { return p.text; }).join('');
       if (!text) throw { code: 'empty_completion' };
       try {
-        var cleaned = text.replace(/^```json\s*|```\s*$/g, '').trim();
-        return JSON.parse(cleaned);
-      } catch(e2) { throw { code: 'invalid_json', text: text }; }
+        var cleaned = text.replace(/^\s*```(?:json)?\s*|\s*```\s*$/g, '').trim();
+        var out = JSON.parse(cleaned);
+        geminiLastModel = used;
+        return out;
+      } catch (e2) { throw { code: 'invalid_json', text: text }; }
     });
   }
+  var geminiLastModel = '';
 
   function blobToGeminiPart(blob) {
     return new Promise(function(resolve, reject) {
@@ -3181,12 +3226,30 @@ body:has(#view-cart:not([hidden]) .cartsum) .toast { bottom: calc(148px + env(sa
     var saveBtn = document.getElementById('set-gemini-save');
     if (saveBtn) saveBtn.addEventListener('click', function() {
       var k = ki ? ki.value.trim() : '';
-      if (!k || k === '••••••••') { if (ks) ks.textContent = 'Saisissez la clé d'abord.'; return; }
-      try { localStorage.setItem(GEMINI_KEY_SK, k); } catch(e) {}
-      if (ks) ks.textContent = '✅ Clé enregistrée';
+      if (!k || k === '••••••••') { if (ks) ks.textContent = 'Saisissez d\'abord la clé.'; return; }
+      try { localStorage.setItem(GEMINI_KEY_SK, k); localStorage.removeItem(GEMINI_MODELS_SK); } catch(e) {}
       if (ki) { ki.value = '••••••••'; ki.dataset.filled = '1'; }
       refreshAiButtons();
+      testGemini();
     });
+    function testGemini() {
+      if (!getGeminiKey()) { if (ks) ks.textContent = 'Aucune clé enregistrée.'; return; }
+      if (ks) ks.textContent = '⏳ Test de la clé…';
+      geminiRequest('Réponds uniquement avec ce JSON : {"ok":true}', null).then(function() {
+        if (ks) ks.textContent = '✅ Clé valide (modèle : ' + geminiLastModel + ')';
+      }).catch(function(e) {
+        var c = e && e.code, m = '❌ ';
+        if (c === 'not_granted') m += 'Clé refusée par Google (vérifiez qu\'elle est correcte et active).';
+        else if (c === 'rate_limited') m += 'Quota atteint, réessayez dans une minute.';
+        else if (c === 'no_model') m += 'Aucun modèle Gemini Flash disponible pour cette clé.';
+        else if (c === 'invalid_request') m += 'Requête refusée : ' + (e.message || '');
+        else if (c === 'server_error') m += 'Erreur serveur Google (' + (e.status || '?') + ').';
+        else m += 'Échec (' + (c || (e && e.message) || 'réseau') + '). Vérifiez la connexion.';
+        if (ks) ks.textContent = m;
+      });
+    }
+    var testBtn = document.getElementById('set-gemini-test');
+    if (testBtn) testBtn.addEventListener('click', testGemini);
     var clearBtn = document.getElementById('set-gemini-clear');
     if (clearBtn) clearBtn.addEventListener('click', function() {
       try { localStorage.removeItem(GEMINI_KEY_SK); } catch(e) {}
