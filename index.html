@@ -287,6 +287,13 @@ body:has(#view-cart:not([hidden]) .cartsum) .toast { bottom: calc(148px + env(sa
 .imp-top { display: flex; align-items: center; gap: 8px; }
 .imp-raw { flex: 1; min-width: 0; font-weight: 600; overflow-wrap: anywhere; }
 .imp select { min-height: 42px; }
+.dupbar { display: block; width: 100%; text-align: left; padding: 11px 12px; border: 1.5px dashed var(--accent); border-radius: 10px; background: var(--surface); color: var(--ink); font: inherit; cursor: pointer; }
+.dpg { display: grid; gap: 10px; padding: 12px; border: 1.5px solid var(--line); border-radius: 10px; background: var(--surface); }
+.dpl { list-style: none; margin: 0; padding: 0; display: grid; gap: 10px; }
+.dpl label { display: flex; gap: 10px; align-items: flex-start; cursor: pointer; }
+.dpl input[type=checkbox] { width: 22px; height: 22px; margin-top: 2px; flex: none; accent-color: var(--accent); }
+.dpl small { display: block; color: var(--muted); font-size: 13px; line-height: 1.4; }
+.msg.ok { color: var(--good); }
 .refs { display: grid; gap: 8px; }
 .ref { display: grid; gap: 3px; width: 100%; text-align: left; padding: 10px 12px; border: 1.5px solid var(--line); border-radius: 10px; background: var(--field); color: var(--ink); font: inherit; cursor: pointer; }
 .ref.on { border-color: var(--accent); box-shadow: inset 0 0 0 1.5px var(--accent); background: var(--surface); }
@@ -399,6 +406,7 @@ body:has(#view-cart:not([hidden]) .cartsum) .toast { bottom: calc(148px + env(sa
       <button type="button" data-v="avoid" aria-pressed="false" aria-label="À éviter seulement" title="À éviter">⚠️</button>
     </div>
     <div id="reclass-s"></div>
+    <div id="dup-s"></div>
     <p class="summary" id="summary" aria-live="polite"></p>
     <ul class="list" id="list"></ul>
   </section>
@@ -693,6 +701,15 @@ body:has(#view-cart:not([hidden]) .cartsum) .toast { bottom: calc(148px + env(sa
   </div>
 </section>
 
+<div class="help-back" id="dup-back" hidden></div>
+<section class="help" id="dup-sheet" role="dialog" aria-modal="true" aria-labelledby="dup-t" hidden>
+  <div class="help-head">
+    <h2 id="dup-t">🔀 Doublons possibles</h2>
+    <button type="button" class="ib" id="dup-close" aria-label="Fermer"><svg class="ic" aria-hidden="true"><use href="#i-close"/></svg></button>
+  </div>
+  <p class="scan-note">Un produit = un seul nom, avec plusieurs références (magasin, prix, format). Rien n'est fusionné sans votre accord, et vous pouvez annuler.</p>
+  <div id="dup-body"></div>
+</section>
 <div class="help-back" id="set-back" hidden></div>
 <section class="help" id="set-sheet" role="dialog" aria-modal="true" aria-labelledby="set-t" hidden>
   <div class="help-head">
@@ -1577,6 +1594,23 @@ body:has(#view-cart:not([hidden]) .cartsum) .toast { bottom: calc(148px + env(sa
     if (!m.length) return null;
     return rankRefs(m)[0];
   }
+  // Cartes de références d'un produit (magasin, prix au kilo, prix, quantité) : un toucher = choisir
+  function refCards(refs, selId, attrs) {
+    var rk = rankRefs(refs), cheapest = null;
+    rk.forEach(function (r) { if (r.unitPrice != null && r.verdict !== 'avoid' && (cheapest == null || r.unitPrice < cheapest)) cheapest = r.unitPrice; });
+    return '<div class="refs" role="radiogroup">' + rk.map(function (r) {
+      var on = r.id === selId, best = cheapest != null && r.unitPrice === cheapest && rk.length > 1;
+      var sub = [r.brand, r.origName && r.origName !== r.name ? '« ' + r.origName + ' »' : '', r.date ? 'relevé le ' + fmtDate(r.date) : ''].filter(Boolean).join(' · ');
+      return '<button type="button" class="ref' + (on ? ' on' : '') + (r.verdict === 'avoid' ? ' avoid' : '') + '" role="radio" aria-checked="' + on + '" ' + attrs + ' data-id="' + esc(r.id) + '">' +
+        '<span class="ref-top"><b class="ref-place">' + esc(r.place || 'Lieu ?') + '</b>' +
+        (best ? '<span class="chip best">Moins cher au ' + esc(GS[r.group] || 'kg') + '</span>' : '') +
+        (r.verdict === 'buy' ? '<span class="chip">à acheter</span>' : r.verdict === 'avoid' ? '<span class="chip">à éviter</span>' : '') +
+        (r.promo ? '<span class="chip promo">promo</span>' : '') + '</span>' +
+        '<span class="ref-main"><span class="ref-unit">' + (r.unitPrice != null ? esc(eur.format(r.unitPrice)) + ' / ' + esc(GS[r.group] || 'kg') : '—') + '</span>' +
+        '<span class="ref-price">' + esc(eur.format(r.price)) + (r.qty != null ? ' · ' + esc(fmtQty(r)) : '') + '</span></span>' +
+        '<span class="ref-sub">' + esc(sub) + '</span></button>';
+    }).join('') + '</div>';
+  }
   function rankRefs(refs) {
     return refs.slice().sort(function (a, b) {
       return ((a.verdict === 'avoid') - (b.verdict === 'avoid')) || ((b.verdict === 'buy') - (a.verdict === 'buy')) ||
@@ -1584,7 +1618,7 @@ body:has(#view-cart:not([hidden]) .cartsum) .toast { bottom: calc(148px + env(sa
     });
   }
 
-  var openDeal = null, pendingDeal = null;
+  var openDeal = null, pendingDeal = null, openRefs = null;
   function addToBasket(it, name, count, deal, askDeal) {
     if (!ready()) return Promise.resolve(false);
     count = count || 1;
@@ -1686,11 +1720,20 @@ body:has(#view-cart:not([hidden]) .cartsum) .toast { bottom: calc(148px + env(sa
         var dc = dealCalc(l.price, l.count || 1, l.deal), dn = l.deal && l.deal.n >= 2 ? l.deal.n - (l.count || 1) : 0;
         var dealRow = l.deal ? '<p class="dealrow"><span class="chip promo">' + ICON('tag') + esc(dealLabel(l.deal)) + (dc.saved > 0 ? ' · −' + esc(eur.format(dc.saved)) : '') + '</span>' +
           (dn > 0 && l.price != null ? '<button type="button" class="chip pick" data-act="bk-inc">+' + dn + ' pour la promo</button>' : '') + '</p>' : '';
-        return '<li class="card bk' + (l.done ? ' done' : '') + '" data-id="' + esc(l.id) + '"><div class="main"><h3>' + esc(l.name) + ' <span class="cnt">× ' + (l.count || 1) + '</span></h3><p class="meta">' + esc(meta) + '</p>' + dealRow + '</div>' +
+        var rf = refsOf(l.name), refRow = '';
+        if (rf.length > 1) {
+          var cur = rf.find(function (x) { return x.id === l.itemId; }), cheap = null;
+          rf.forEach(function (x) { if (x.unitPrice != null && x.verdict !== 'avoid' && (!cheap || x.unitPrice < cheap.unitPrice)) cheap = x; });
+          var cheaper = cur && cheap && cheap.id !== cur.id && cur.unitPrice != null && cheap.unitPrice < cur.unitPrice - 0.0001;
+          refRow = '<p class="dealrow"><button type="button" class="chip pick' + (openRefs === l.id ? ' on' : '') + '" data-act="bk-refs">' + (openRefs === l.id ? 'Fermer la comparaison' : 'Comparer ' + rf.length + ' magasins') + '</button>' +
+            (cheaper ? '<span class="chip best">Moins cher chez ' + esc(cheap.place || '?') + ' · ' + esc(eur.format(cheap.unitPrice)) + '/' + esc(GS[cheap.group] || 'kg') + '</span>' : '') + '</p>';
+        }
+        var refPanel = openRefs === l.id && rf.length ? '<div class="buy-panel"><p class="why-t">Choisir le magasin</p>' + refCards(rf, l.itemId, 'data-act="bk-pickref"') + '</div>' : '';
+        return '<li class="card bk' + (l.done ? ' done' : '') + '" data-id="' + esc(l.id) + '"><div class="main"><h3>' + esc(l.name) + ' <span class="cnt">× ' + (l.count || 1) + '</span></h3><p class="meta">' + esc(meta) + '</p>' + dealRow + refRow + '</div>' +
           '<span class="amt">' + (l.price != null ? esc(eur.format(lineTotal(l))) + (dc.saved > 0 ? '<small class="was">' + esc(eur.format(dc.base)) + '</small>' : '') : '—') + '</span>' +
           '<div class="acts"><span class="stepper"><button type="button" class="ib sm" data-act="bk-dec" aria-label="Moins" title="Moins">−</button><span>' + (l.count || 1) + '</span><button type="button" class="ib sm" data-act="bk-inc" aria-label="Plus" title="Plus">+</button></span>' +
           '<span class="grp sp">' + ib('bk-tick', 'check', 'Déjà dans le chariot', 'ok', !!l.done) + ib('bk-deal', 'tag', 'Promo (2ᵉ à −50 %, 3 pour 2…)', '', !!l.deal) + ib('bk-edit', 'pencil', 'Corriger le lieu ou le prix', '') + ib('bk-del', 'trash', 'Retirer du panier', 'del') + '</span></div>' +
-          editPanel(l) + dealPanel(l) + '</li>';
+          editPanel(l) + dealPanel(l) + refPanel + '</li>';
       }).join('') + '</ul>';
     });
     if (tk.length) {
@@ -1777,6 +1820,14 @@ body:has(#view-cart:not([hidden]) .cartsum) .toast { bottom: calc(148px + env(sa
     else if (act === 'bk-dec') { if ((l.count || 1) > 1) basket.patch(id, { count: l.count - 1 }).catch(function () { toast('Modification refusée.'); }); }
     else if (act === 'bk-del') { basket.remove(id).then(function () { toast('Retiré du panier'); }).catch(function () { toast('Suppression refusée.'); }); }
     else if (act === 'bk-tick') { basket.patch(id, { done: !l.done }).catch(function () { toast('Modification refusée.'); }); }
+    else if (act === 'bk-refs') { openRefs = openRefs === id ? null : id; renderCart(); }
+    else if (act === 'bk-pickref') {
+      var rr = items.find(function (x) { return x.id === b.getAttribute('data-id'); }); if (!rr) return;
+      openRefs = null;
+      basket.patch(id, { place: rr.place || '', price: rr.price, brand: rr.brand || '', cat: rr.cat || l.cat || '', itemId: rr.id, promo: !!rr.promo, regularPrice: rr.promo && rr.regularPrice != null ? rr.regularPrice : null })
+        .then(function () { toast('Choisi : ' + (rr.place || 'lieu ?') + ' · ' + eur.format(rr.price)); }).catch(function () { toast('Modification refusée.'); });
+      renderCart();
+    }
     else if (act === 'bk-edit') { openEdit = openEdit === id ? null : id; openDeal = null; renderCart(); }
     else if (act === 'bk-close') { openEdit = null; renderCart(); }
     else if (act === 'bk-deal') { openDeal = openDeal === id ? null : id; openEdit = null; renderCart(); }
@@ -1894,20 +1945,7 @@ body:has(#view-cart:not([hidden]) .cartsum) .toast { bottom: calc(148px + env(sa
         ln.cands.map(function (x, j) { return '<option value="' + j + '"' + (j === ln.pi ? ' selected' : '') + '>' + esc(x.name) + '</option>'; }).join('') +
         '<option value="-1"' + (ln.pi < 0 ? ' selected' : '') + '>Aucun de ceux-là</option></select></div>';
       if (c) {
-        var rk = rankRefs(c.refs), cheapest = null;
-        rk.forEach(function (r) { if (r.unitPrice != null && r.verdict !== 'avoid' && (cheapest == null || r.unitPrice < cheapest)) cheapest = r.unitPrice; });
-        h += '<div class="field"><span class="lbl">Où l\'acheter · touchez pour choisir</span><div class="refs" role="radiogroup">' +
-          rk.map(function (r, j) {
-            var on = r.id === ln.ref, best = cheapest != null && r.unitPrice === cheapest && rk.length > 1;
-            return '<button type="button" class="ref' + (on ? ' on' : '') + (r.verdict === 'avoid' ? ' avoid' : '') + '" role="radio" aria-checked="' + on + '" data-act="imp-ref" data-i="' + i + '" data-id="' + esc(r.id) + '">' +
-              '<span class="ref-top"><b class="ref-place">' + esc(r.place || 'Lieu ?') + '</b>' +
-              (best ? '<span class="chip best">Moins cher au ' + esc(GS[r.group] || 'kg') + '</span>' : '') +
-              (r.verdict === 'buy' ? '<span class="chip">à acheter</span>' : r.verdict === 'avoid' ? '<span class="chip">à éviter</span>' : '') +
-              (r.promo ? '<span class="chip promo">promo</span>' : '') + '</span>' +
-              '<span class="ref-main"><span class="ref-unit">' + (r.unitPrice != null ? esc(eur.format(r.unitPrice)) + ' / ' + esc(GS[r.group] || 'kg') : '—') + '</span>' +
-              '<span class="ref-price">' + esc(eur.format(r.price)) + (r.qty != null ? ' · ' + esc(fmtQty(r)) : '') + '</span></span>' +
-              '<span class="ref-sub">' + esc([r.brand, r.date ? 'relevé le ' + fmtDate(r.date) : ''].filter(Boolean).join(' · ')) + '</span></button>';
-          }).join('') + '</div></div>';
+        h += '<div class="field"><span class="lbl">Où l\'acheter · touchez pour choisir</span>' + refCards(c.refs, ln.ref, 'data-act="imp-ref" data-i="' + i + '"') + '</div>';
         if (ln.off) h += '<p class="meta">Pas de relevé chez ' + esc(imp.store) + ' pour cet article : meilleur choix proposé.</p>';
         if (c.refs.length > 1) h += '<p class="meta">Proposé par défaut : ' + (imp.store ? 'celui de ' + esc(imp.store) + ' s\'il existe, sinon ' : '') + 'le moins cher au ' + esc(GS[c.refs[0].group] || 'kg') + ' (« à acheter » avant, « à éviter » après).</p>';
         if (c.refs.length > 1 || ln.cands.length > 1) h += '<button type="button" class="linkbtn" data-act="imp-dup" data-i="' + i + '">+ Prendre aussi une autre référence</button>';
@@ -2945,7 +2983,107 @@ body:has(#view-cart:not([hidden]) .cartsum) .toast { bottom: calc(148px + env(sa
     var on = aperoCands().filter(function (x) { return !reclassOff[x.k]; }).length;
     Array.prototype.forEach.call(document.querySelectorAll('[data-act="rcl-apply"]'), function (b) { b.textContent = 'Reclasser ' + on + (on > 1 ? ' produits' : ' produit') + ' en Apéro'; b.disabled = !on; });
   });
-  function renderAll() { fillPlaces(); render(); renderCart(); renderSpend(); renderCartBar(); renderReclass(); if (rc && !rc.busy) { /* ne pas écraser une saisie en cours */ } }
+  // ---------- Doublons possibles & fusion (un produit = un nom, plusieurs références) ----------
+  var DUP_IGN = 'prix-rayon-dup-ignore', DUP_UNDO = 'prix-rayon-dup-undo', dupCache = [];
+  var DUP_STOP = ['marque', 'type', 'petit', 'petite', 'maxi', 'mini', 'format', 'classic', 'classique', 'simple', 'eco', 'grand', 'grande', 'x'];
+  function dupToks(name) { return tokens(name).filter(function (t) { return DUP_STOP.indexOf(t) < 0 && !/^x?\d+[a-z%]*$/.test(t); }); }
+  function dupSim(A, B) {
+    if (!A.length || !B.length) return false;
+    if (!(A[0] === B[0] || tmatch(A[0], B[0]))) return false; // même mot-clé de tête (« gouda », « pain »…)
+    var inter = 0; A.forEach(function (a) { if (B.some(function (b) { return a === b || tmatch(a, b); })) inter++; });
+    var mn = Math.min(A.length, B.length), un = A.length + B.length - inter;
+    return inter > 0 && (inter / un >= 0.5 || (inter === mn && mn >= 2));
+  }
+  function dupIgn() { try { return JSON.parse(localStorage.getItem(DUP_IGN) || '[]') || []; } catch (e) { return []; } }
+  function dupPair(a, b) { return a < b ? a + '|' + b : b + '|' + a; }
+  function dupGroups() {
+    var by = {}; items.forEach(function (it) { var k = key(it.name); if (!k) return; (by[k] = by[k] || { key: k, name: it.name, refs: [] }).refs.push(it); });
+    var ks = Object.keys(by), ign = dupIgn(), par = {};
+    ks.forEach(function (k) { par[k] = k; by[k].t = dupToks(by[k].name); });
+    var fnd = function (x) { while (par[x] !== x) { par[x] = par[par[x]]; x = par[x]; } return x; };
+    for (var i = 0; i < ks.length; i++) for (var j = i + 1; j < ks.length; j++) {
+      if (ign.indexOf(dupPair(ks[i], ks[j])) >= 0) continue;
+      if (dupSim(by[ks[i]].t, by[ks[j]].t)) par[fnd(ks[i])] = fnd(ks[j]);
+    }
+    var g = {}; ks.forEach(function (k) { (g[fnd(k)] = g[fnd(k)] || []).push(by[k]); });
+    return Object.keys(g).map(function (r) { return g[r]; }).filter(function (a) { return a.length > 1; });
+  }
+  function renderDup() {
+    var box = $('#dup-s'); if (!box) return;
+    if (mode === 'pending') { box.innerHTML = ''; return; }
+    var n = dupGroups().length;
+    box.innerHTML = n ? '<button type="button" class="dupbar" data-act="dp-open">🔀 <b>' + n + '</b> produit' + (n > 1 ? 's' : '') + ' possiblement en double · <u>Voir et fusionner</u></button>' : '';
+  }
+  function dupUndoRec() { try { return JSON.parse(localStorage.getItem(DUP_UNDO) || 'null'); } catch (e) { return null; } }
+  function renderDupSheet(msg) {
+    dupCache = dupGroups();
+    var h = msg ? '<p class="msg ok" role="status">' + esc(msg) + '</p>' : '';
+    if (!dupCache.length) h += '<p class="meta">Aucun doublon possible pour le moment.</p>';
+    dupCache.forEach(function (grp, g) {
+      var best = grp.slice().sort(function (a, b) { return (b.refs.length - a.refs.length) || (a.name.length - b.name.length); })[0];
+      h += '<div class="dpg" data-g="' + g + '"><ul class="dpl">' + grp.map(function (p) {
+        var rs = rankRefs(p.refs).map(function (r) { return esc((r.place || '?') + ' · ' + eur.format(r.price) + (r.qty != null ? ' · ' + fmtQty(r) : '') + (r.unitPrice != null ? ' · ' + eur.format(r.unitPrice) + '/' + (GS[r.group] || 'kg') : '')); });
+        return '<li><label><input type="checkbox" data-k="' + esc(p.key) + '" checked><span><b>' + esc(p.name) + '</b><small>' + rs.join('<br>') + '</small></span></label></li>';
+      }).join('') + '</ul>' +
+        '<div class="field"><label>Nom du produit après fusion</label><input type="text" class="dp-name" value="' + esc(best.name) + '" autocomplete="off"></div>' +
+        '<p class="msg" role="alert"></p>' +
+        '<div class="actions-row"><button type="button" class="btn small primary" data-act="dp-merge" data-g="' + g + '">Fusionner les cochés</button>' +
+        '<button type="button" class="btn small" data-act="dp-no" data-g="' + g + '">Ce ne sont pas les mêmes</button></div></div>';
+    });
+    var u = dupUndoRec();
+    if (u && u.n) h += '<div class="actions-row"><button type="button" class="linkbtn" data-act="dp-undo">↩ Annuler la dernière fusion (' + u.n + ' relevé' + (u.n > 1 ? 's' : '') + ' → « ' + esc(u.name) + ' »)</button></div>';
+    $('#dup-body').innerHTML = h;
+  }
+  function openDup() { renderDupSheet(); $('#dup-sheet').hidden = false; $('#dup-back').hidden = false; }
+  function closeDup() { $('#dup-sheet').hidden = true; $('#dup-back').hidden = true; }
+  function dupApply(list, undo) {
+    var ch = Promise.resolve();
+    list.forEach(function (x) {
+      ch = ch.then(function () {
+        var coll = x.c === 'i' ? null : x.c === 'b' ? basket : purchases;
+        return coll ? coll.patch(x.id, x.patch) : patchItem(x.id, x.patch);
+      });
+    });
+    return ch;
+  }
+  $('#dup-s').addEventListener('click', function (e) { if (e.target.closest('[data-act="dp-open"]')) openDup(); });
+  $('#dup-close').addEventListener('click', closeDup);
+  $('#dup-back').addEventListener('click', closeDup);
+  document.addEventListener('keydown', function (e) { if (e.key === 'Escape' && !$('#dup-sheet').hidden) closeDup(); });
+  $('#dup-body').addEventListener('click', function (e) {
+    var b = e.target.closest('button[data-act]'); if (!b) return;
+    var act = b.getAttribute('data-act'), g = parseInt(b.getAttribute('data-g'), 10);
+    var card = b.closest('.dpg'), grp = dupCache[g];
+    if (act === 'dp-no' && grp) {
+      var ign = dupIgn(); grp.forEach(function (x, i) { grp.forEach(function (y, j) { if (j > i) { var pr = dupPair(x.key, y.key); if (ign.indexOf(pr) < 0) ign.push(pr); } }); });
+      try { localStorage.setItem(DUP_IGN, JSON.stringify(ign)); } catch (e2) {}
+      renderDupSheet('C\'est noté : ces produits ne seront plus proposés ensemble.'); renderDup();
+    } else if (act === 'dp-merge' && grp && card) {
+      var msgEl = card.querySelector('.msg'); msgEl.textContent = '';
+      var ks = Array.prototype.map.call(card.querySelectorAll('input[data-k]:checked'), function (i) { return i.getAttribute('data-k'); });
+      var nm = card.querySelector('.dp-name').value.replace(/\s+/g, ' ').trim();
+      if (ks.length < 2) { msgEl.textContent = 'Cochez au moins deux produits à regrouper.'; return; }
+      if (!nm) { msgEl.textContent = 'Indiquez le nom du produit après fusion.'; return; }
+      var ids = {}, todo = [], undo = [];
+      grp.filter(function (p) { return ks.indexOf(p.key) >= 0; }).forEach(function (p) {
+        p.refs.forEach(function (r) {
+          ids[r.id] = true;
+          if (r.name !== nm) { todo.push({ c: 'i', id: r.id, patch: { name: nm, origName: r.origName || r.name } }); undo.push({ c: 'i', id: r.id, patch: { name: r.name, origName: r.origName || null } }); }
+        });
+      });
+      basket.items.forEach(function (l) { if (ids[l.itemId] && l.name !== nm) { todo.push({ c: 'b', id: l.id, patch: { name: nm } }); undo.push({ c: 'b', id: l.id, patch: { name: l.name } }); } });
+      purchases.items.forEach(function (l) { if (ids[l.itemId] && l.name !== nm) { todo.push({ c: 'p', id: l.id, patch: { name: nm } }); undo.push({ c: 'p', id: l.id, patch: { name: l.name } }); } });
+      var nref = Object.keys(ids).length;
+      try { localStorage.setItem(DUP_UNDO, JSON.stringify({ t: Date.now(), name: nm, n: nref, undo: undo })); } catch (e3) {}
+      dupApply(todo).then(function () { renderDupSheet('Fusionné : « ' + nm + ' » a maintenant ' + nref + ' référence' + (nref > 1 ? 's' : '') + '.'); toast('Produits fusionnés'); })
+        .catch(function () { toast('Fusion interrompue.'); renderDupSheet(); });
+    } else if (act === 'dp-undo') {
+      var u = dupUndoRec(); if (!u || !u.undo) return;
+      dupApply(u.undo).then(function () { try { localStorage.removeItem(DUP_UNDO); } catch (e4) {} renderDupSheet('Fusion annulée.'); toast('Fusion annulée'); });
+    }
+  });
+
+  function renderAll() { fillPlaces(); render(); renderDup(); renderCart(); renderSpend(); renderCartBar(); renderReclass(); if (rc && !rc.busy) { /* ne pas écraser une saisie en cours */ } }
 
   // ---------- Événements de la recherche ----------
   // Pas d'événement « change » sur la recherche : il se déclenche au toucher d'un bouton et ferait perdre le premier appui.
