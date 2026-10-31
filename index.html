@@ -1819,6 +1819,8 @@ body:has(#view-cart:not([hidden]) .cartsum) .toast { bottom: calc(148px + env(sa
       var s = raw.replace(/^[\s\-–—*•·>▪■□☐☑✓✔\[\]]+/, '').replace(/^\d+[.)]\s+/, '').trim();
       if (!s || /:\s*$/.test(s)) return;
       if (s.length <= 25 && GREET.test(norm(s))) return;
+      s = stripDest(s).replace(LEAD, '').replace(TRAIL, '').replace(/^(?:du|des|de la|de l['’]|d['’])\s*/i, '').replace(/\s+/g, ' ').trim();
+      if (!s) return;
       var count = 1, m;
       if ((m = s.match(/^(\d+)\s*(?:x|×)\s*(.+)$/i))) { count = parseInt(m[1], 10); s = m[2]; }
       else if ((m = s.match(/^(.+?)\s*(?:x|×)\s*(\d+)$/i))) { count = parseInt(m[2], 10); s = m[1]; }
@@ -1847,8 +1849,10 @@ body:has(#view-cart:not([hidden]) .cartsum) .toast { bottom: calc(148px + env(sa
         c.score = Math.max(c.score, score); c.refs.push(it);
       }
     });
+    var first = qt[0];
+    var lead = function (c) { var t0 = tokens(c.name)[0]; return t0 && tmatch(first, t0) ? 1 : 0; };
     return Object.keys(byKey).map(function (k) { return byKey[k]; }).sort(function (a, b) {
-      return (b.score - a.score) || (b.refs.length - a.refs.length) || a.name.localeCompare(b.name, 'fr');
+      return (b.score - a.score) || (lead(b) - lead(a)) || (tokens(a.name).length - tokens(b.name).length) || (b.refs.length - a.refs.length) || a.name.localeCompare(b.name, 'fr');
     });
   }
   function pickRef(cand, store) {
@@ -1913,7 +1917,12 @@ body:has(#view-cart:not([hidden]) .cartsum) .toast { bottom: calc(148px + env(sa
   $('#imp-open').addEventListener('click', function () { $('#imp').hidden = !$('#imp').hidden; if (!$('#imp').hidden) $('#imp-text').focus(); });
   $('#imp-close').addEventListener('click', function () { $('#imp').hidden = true; });
   $('#imp-go').addEventListener('click', function () {
-    var lines = parseMessage($('#imp-text').value);
+    var raw0 = $('#imp-text').value;
+    if (vdIntent(raw0) === 'base' && /\d\s*(?:€|euros?)/i.test(raw0)) { toast('Ce message contient des prix : utilisez 🎤 en mode « Prix relevés » pour les enregistrer.'); }
+    if (!/[\n,;]/.test(raw0.trim()) && (LEAD.test(raw0.trim()) || / et | puis /i.test(raw0) || new RegExp(DEST_CART.source, 'i').test(raw0))) {
+      var pre = dictCart(raw0); if (pre.length) raw0 = pre.join('\n');
+    }
+    var lines = parseMessage(raw0);
     if (!lines.length) { toast('Aucun article repéré dans ce message.'); return; }
     imp = { store: '', lines: lines.map(function (l) { return { raw: l.raw, name: l.name, count: l.count, cands: candidatesFor(l.name), pi: -1, ref: null, off: false }; }) };
     imp.lines.forEach(function (ln) { if (ln.cands.length) setLineProduct(ln, 0); });
@@ -3359,7 +3368,20 @@ body:has(#view-cart:not([hidden]) .cartsum) .toast { bottom: calc(148px + env(sa
   var NUMW_RE = 'un|une|deux|trois|quatre|cinq|six|sept|huit|neuf|dix|onze|douze|quinze|vingt';
   var MEAS = 'kilogrammes?|kilos?|kg|grammes?|gr|g|litres?|l|centilitres?|cl|millilitres?|ml';
   var PACK = 'paquets?|bouteilles?|boites?|boîtes?|pots?|packs?|sachets?|barquettes?|tranches?|pieces?|pièces?|briques?|canettes?|filets?|bottes?|tablettes?|boules?|rouleaux?|lots?';
-  var LEAD = /^(?:(?:il me faut|il faut|je veux|j['’]ai besoin d['’]?(?:e\s)?|ajoute[rsz]?|ajout|mets|mettre|met|achète[rsz]?|achete[rsz]?|prends?|prendre|note[rsz]?)(?:\s+|$)(?:(?:au|dans le)\s+panier(?:\s+|$))?)+/i;
+  var LEAD = /^(?:(?:peux[- ]tu|pouvez[- ]vous|tu peux|vous pouvez|je voudrais|je souhaite|j['’]aimerais|il me faut|il faut|je veux|j['’]ai besoin d['’]?(?:e\s)?|ajoute[rsz]?|ajout|rajoute[rsz]?|rajout|inscris|inscrire|enregistre[rsz]?|mets|mettre|met|achète[rsz]?|achete[rsz]?|prends?|prendre|note[rsz]?)(?:\s+|$)(?:(?:au|dans le)\s+panier(?:\s+|$))?(?:(?:un|le|les)\s+)?(?:nouveau(?:x)?\s+(?:produits?|articles?)\s*:?\s*)?)+/i;
+  // Formules de destination : « à ma liste de courses », « dans le panier » (liste) / « dans la base », « en rayon » (relevé de prix)
+  var DEST_CART = /\s+(?:(?:à|a|sur|dans|en|pour)\s+(?:ma|mon|la|le|notre|ta|ton|une|cette)\s+(?:nouvelle\s+)?(?:liste(?:\s+de\s+(?:courses?|commissions?))?|panier|courses?))(?=\s|[,;.!?]|$)/gi;
+  var DEST_BASE = /\s+(?:(?:à|a|sur|dans|en)\s+(?:la|ma|notre|le)\s+(?:base(?:\s+de\s+(?:donn[ée]es|prix))?|relev[ée]s?|catalogue|prix\s+en\s+rayon))(?=\s|[,;.!?]|$)/gi;
+  function stripDest(t) { return String(t).replace(DEST_CART, ' ').replace(DEST_BASE, ' '); }
+  // Intention : 'cart' (liste de courses) ou 'base' (enregistrer un prix relevé) ; null si indécidable
+  function vdIntent(text) {
+    var t = ' ' + String(text || '') + ' ';
+    var b = new RegExp(DEST_BASE.source, 'i').test(t) || /\b(?:enregistre[rsz]?|relev[ée]s?\s+(?:de\s+)?prix|nouveau\s+prix|prix\s+relev[ée]s?)\b/i.test(t);
+    if (b) return 'base';
+    if (new RegExp(DEST_CART.source, 'i').test(t) || /\b(?:liste de courses|panier)\b/i.test(t)) return 'cart';
+    if (/\d\s*(?:€|euros?)|\d+[,.]\d{2}\b/i.test(t)) return 'base';
+    return null;
+  }
   var TRAIL = /\s+(?:(?:au|dans le)\s+panier|s['’]il te pla[iî]t|s['’]il vous pla[iî]t|stp|svp|merci|c['’]est tout|voil[aà])\s*$/i;
   function vdWords(s) { return s.replace(new RegExp('(^|\\s)(' + NUMW_RE + ')(?=\\s)', 'gi'), function (m, sp, w) { return sp + NUMW[w.toLowerCase()]; }); }
   function vdProtect(s) { return s.replace(/(\d),(\d)/g, '$1\u0001$2'); }
@@ -3369,7 +3391,7 @@ body:has(#view-cart:not([hidden]) .cartsum) .toast { bottom: calc(148px + env(sa
   }
 
   function dictCart(text) {
-    var t = ' ' + vdProtect(String(text || '').replace(/[\r\n]+/g, ' , ').replace(/\s+/g, ' ').trim().replace(LEAD, '')) + ' ';
+    var t = ' ' + vdProtect(stripDest(String(text || '').replace(/[\r\n]+/g, ' , ').replace(/\s+/g, ' ')).trim().replace(LEAD, '')) + ' ';
     t = vdSeparators(t);
     t = t.replace(new RegExp('\\s(?=(?:(?:du|des|de la|' + NUMW_RE + ')\\s|de l[\'’]|\\d+(?:\u0001\\d+)?\\s(?:' + MEAS + ')\\s(?:de\\s|d[\'’])|\\d+\\s(?!(?:' + MEAS + ')\\b)))', 'gi'), ' ,');
     var out = [];
@@ -3389,7 +3411,7 @@ body:has(#view-cart:not([hidden]) .cartsum) .toast { bottom: calc(148px + env(sa
   }
 
   function dictBase(text) {
-    var t = ' ' + String(text || '').replace(/[\r\n]+/g, ' ; ').replace(/\s+/g, ' ') + ' ', store = '', m;
+    var t = ' ' + stripDest(String(text || '').replace(/[\r\n]+/g, ' ; ').replace(/\s+/g, ' ')) + ' ', store = '', m;
     if ((m = t.match(/\schez\s+([^\s,;.]+(?:\s[A-ZÀ-Ý][^\s,;.]*)?)/i))) { store = m[1]; t = t.replace(m[0], ' '); }
     t = vdWords(t);
     t = t.replace(/(\d+)\s*(litres?|kilos?)\s+et\s+demi\b/gi, '$1,5 $2').replace(/\b(?:1\s+)?demi[- ]litre\b/gi, '50 cl').replace(/\b(?:1\s+)?demi[- ]kilo\b/gi, '500 g');
@@ -3444,6 +3466,8 @@ body:has(#view-cart:not([hidden]) .cartsum) .toast { bottom: calc(148px + env(sa
     var text = $('#vd-text').value.trim();
     if (!text) { vdNote('Dictez ou écrivez d\'abord quelque chose.'); $('#vd-text').focus(); return; }
     vdMicEnd();
+    var it0 = vdIntent(text);
+    if (it0 && it0 !== vMode) { vMode = it0; vdRender(); }
     if (vMode === 'cart') {
       var lines = dictCart(text);
       if (!lines.length) { vdNote('Aucun produit repéré. Séparez les produits par « et » ou des virgules.'); return; }
@@ -3466,6 +3490,8 @@ body:has(#view-cart:not([hidden]) .cartsum) .toast { bottom: calc(148px + env(sa
     if (!text) { vdNote('Dictez ou écrivez d\'abord quelque chose.'); $('#vd-text').focus(); return; }
     if (!getGeminiKey()) { vdNote('Clé API Gemini manquante : ajoutez-la dans ⚙️ Réglages.'); return; }
     vdMicEnd();
+    var it0 = vdIntent(text);
+    if (it0 && it0 !== vMode) { vMode = it0; vdRender(); }
     var list = productList();
     var fail = function (e) {
       var c = e && e.code;
@@ -3473,8 +3499,8 @@ body:has(#view-cart:not([hidden]) .cartsum) .toast { bottom: calc(148px + env(sa
         : c === 'timeout' ? 'Gemini met trop de temps à répondre : utilisez ⚡ Analyser.' : 'Gemini n\'a pas pu analyser la dictée : utilisez ⚡ Analyser.';
     };
     if (vMode === 'cart') {
-      vdBusy(true); vdNote('Claude découpe la dictée… (quelques secondes)');
-      var p = 'Voici la transcription d\'une dictée vocale de liste de courses en français. Elle peut contenir des mots mal reconnus : corrige-les d\'après le sens. Découpe-la en produits. ' +
+      vdBusy(true); vdNote('Gemini découpe la dictée… (quelques secondes)');
+      var p = 'Voici la transcription d\'une dictée vocale de liste de courses en français. Elle peut contenir des mots mal reconnus : corrige-les d\'après le sens. Découpe-la en produits. Ignore les formules de commande et de destination (« ajoute », « mets », « à ma liste de courses », « au panier », « s\'il te plaît ») : ne garde que les noms de produits et les quantités. ' +
         'Réponds uniquement avec un objet JSON {"items": [{"name": nom du produit, de préférence le nom exact d\'un produit de la LISTE s\'il correspond, "count": nombre d\'unités, entier, 1 par défaut}]}. N\'invente aucun produit.\n\nLISTE :\n' + listText(list) + '\n\nDICTÉE :\n' + text;
       withTimeout(sampleFn.json(p, { modelTier: 'quick', cache: false }), 60000, 'timeout').then(function (r) {
         var lines = (r && Array.isArray(r.items) ? r.items : []).map(function (x) {
@@ -3482,7 +3508,7 @@ body:has(#view-cart:not([hidden]) .cartsum) .toast { bottom: calc(148px + env(sa
           return n ? (c > 1 ? c + ' x ' : '') + n : '';
         }).filter(Boolean);
         vdBusy(false);
-        if (!lines.length) { vdNote('Claude n\'a repéré aucun produit.'); return; }
+        if (!lines.length) { vdNote('Gemini n\'a repéré aucun produit.'); return; }
         vdToCart(lines);
       }).catch(function (e) { vdBusy(false); vdNote(fail(e)); });
       return;
