@@ -1,3 +1,5 @@
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Prix en rayon</title>
 <link rel="manifest" href="manifest.json">
 <meta name="theme-color" content="#0e6b50">
@@ -6,7 +8,6 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
 <meta name="apple-mobile-web-app-title" content="Prix en rayon">
 <link rel="apple-touch-icon" href="icon-192.png">
-<meta name="claude:viewport-fit-sides" content="cover">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600;700&family=Figtree:wght@400;500;600;700&display=swap">
 <style>
 /* Layout : une colonne pensée pour le téléphone. Barre d'onglets collée en haut, barre du panier collée en bas. Chaque relevé a son étiquette de rayon blanche à droite, avec le prix au kilo en bandeau. */
@@ -886,6 +887,7 @@ body:has(#view-cart:not([hidden]) .cartsum) .toast { bottom: calc(148px + env(sa
     try { items = JSON.parse(localStorage.getItem(LS_KEY) || '[]') || []; } catch (e) { items = []; }
     setMode('local');
     purchases.local(); basket.local();
+    renderAll();
   }
   function putItem(rec, id) {
     if (mode === 'db' && col) { return (id ? col.doc(id) : col.doc()).set(rec); }
