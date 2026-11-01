@@ -2768,6 +2768,8 @@ body:has(#view-cart:not([hidden]) .cartsum) .toast { bottom: calc(148px + env(sa
     });
     return { total: cents(total), rows: Object.keys(agg).map(function (k) { return agg[k]; }).sort(function (a, b) { return b.sv - a.sv; }).slice(0, 3) };
   }
+  var spendAuto = false;
+  $('#spend-body').addEventListener('click', function (e) { var b = e.target.closest('button[data-sp]'); if (!b) return; var t = $('#spend-period button[data-p="' + b.getAttribute('data-sp') + '"]'); if (t) t.click(); });
   function renderSpend() {
     var box = $('#spend-body');
     if (mode === 'pending') { box.innerHTML = ''; return; }
@@ -2779,7 +2781,9 @@ body:has(#view-cart:not([hidden]) .cartsum) .toast { bottom: calc(148px + env(sa
       return String(b.date || '').localeCompare(String(a.date || '')) || (b.createdAt || 0) - (a.createdAt || 0);
     });
     if (!list.length) {
-      box.innerHTML = '<div class="empty"><h2>Rien sur cette période</h2><p>Changez de période pour voir vos autres achats.</p></div>';
+      if (spendPeriod === 'month' && !spendAuto) { spendAuto = true; var b30 = $('#spend-period button[data-p="30"]'); if (b30) { b30.click(); return; } }
+      box.innerHTML = '<div class="empty"><h2>Rien sur cette période</h2><p>Vos ' + purchases.items.length + ' achats sont bien enregistrés, mais aucun ne tombe dans cette période.</p>' +
+        '<div class="actions-row"><button type="button" class="btn small primary" data-sp="30">Voir les 30 derniers jours</button><button type="button" class="btn small" data-sp="all">Tout afficher</button></div></div>';
       return;
     }
     var total = 0, saved = 0, byPlace = {}, byCat = {}, byArt = {}, byDow = { Lundi: 0, Mardi: 0, Mercredi: 0, Jeudi: 0, Vendredi: 0, Samedi: 0, Dimanche: 0 }, trips = {};
@@ -3693,7 +3697,9 @@ body:has(#view-cart:not([hidden]) .cartsum) .toast { bottom: calc(148px + env(sa
   // Service Worker PWA
   if ('serviceWorker' in navigator) {
     window.addEventListener('load', function() {
-      navigator.serviceWorker.register('sw.js').catch(function() {});
+      var hadCtl = !!navigator.serviceWorker.controller, reloaded = false;
+      navigator.serviceWorker.addEventListener('controllerchange', function () { if (hadCtl && !reloaded) { reloaded = true; location.reload(); } });
+      navigator.serviceWorker.register('sw.js').then(function (reg) { try { reg.update(); } catch (e) {} }).catch(function() {});
     });
   }
 })();

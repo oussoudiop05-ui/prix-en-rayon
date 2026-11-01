@@ -1,30 +1,29 @@
-const CACHE = 'prix-rayon-v1';
+// Prix en rayon : réseau d'abord (toujours la dernière version), cache en secours hors connexion
+const CACHE = 'prix-rayon-v2';
 const ASSETS = ['./', './index.html', './manifest.json', './icon-192.png', './icon-512.png'];
 
-self.addEventListener('install', function(e) {
-  e.waitUntil(caches.open(CACHE).then(function(c) { return c.addAll(ASSETS); }));
+self.addEventListener('install', function (e) {
+  e.waitUntil(caches.open(CACHE).then(function (c) { return c.addAll(ASSETS.map(function (u) { return new Request(u, { cache: 'reload' }); })); }));
   self.skipWaiting();
 });
 
-self.addEventListener('activate', function(e) {
-  e.waitUntil(caches.keys().then(function(keys) {
-    return Promise.all(keys.filter(function(k) { return k !== CACHE; }).map(function(k) { return caches.delete(k); }));
-  }));
-  self.clients.claim();
+self.addEventListener('activate', function (e) {
+  e.waitUntil(caches.keys().then(function (keys) {
+    return Promise.all(keys.filter(function (k) { return k !== CACHE; }).map(function (k) { return caches.delete(k); }));
+  }).then(function () { return self.clients.claim(); }));
 });
 
-self.addEventListener('fetch', function(e) {
-  // Ne pas intercepter les appels API Gemini
-  if (e.request.url.includes('generativelanguage.googleapis.com')) return;
+self.addEventListener('fetch', function (e) {
+  var req = e.request;
+  if (req.method !== 'GET') return;
+  var url = new URL(req.url);
+  if (url.origin !== location.origin) return; // API Gemini, polices, pdf.js : jamais interceptés
   e.respondWith(
-    caches.match(e.request).then(function(cached) {
-      return cached || fetch(e.request).then(function(response) {
-        if (response.ok && e.request.method === 'GET') {
-          var clone = response.clone();
-          caches.open(CACHE).then(function(c) { c.put(e.request, clone); });
-        }
-        return response;
-      }).catch(function() { return cached; });
+    fetch(req, { cache: 'no-cache' }).then(function (res) {
+      if (res && res.ok) { var copy = res.clone(); caches.open(CACHE).then(function (c) { c.put(req, copy); }); }
+      return res;
+    }).catch(function () {
+      return caches.match(req).then(function (hit) { return hit || caches.match('./index.html'); });
     })
   );
 });
