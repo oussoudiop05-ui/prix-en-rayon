@@ -287,6 +287,13 @@ body:has(#view-cart:not([hidden]) .cartsum) .toast { bottom: calc(148px + env(sa
 .imp-top { display: flex; align-items: center; gap: 8px; }
 .imp-raw { flex: 1; min-width: 0; font-weight: 600; overflow-wrap: anywhere; }
 .imp select { min-height: 42px; }
+.pgroup { list-style: none; display: grid; gap: 10px; padding: 12px; background: var(--surface); border: 2px solid var(--accent); border-radius: 12px; }
+.pg-head h3 { margin: 0; font-size: 19px; }
+.pg-head .meta { margin: 2px 0 0; }
+.pg-best { margin: 4px 0 0; font-size: 15px; color: var(--accent); }
+.pgroup ul.sub { gap: 8px; }
+.card.inpg { background: var(--bg); }
+.card.inpg h3 { font-size: 17px; }
 .dupbar { display: block; width: 100%; text-align: left; padding: 11px 12px; border: 1.5px dashed var(--accent); border-radius: 10px; background: var(--surface); color: var(--ink); font: inherit; cursor: pointer; }
 .dpg { display: grid; gap: 10px; padding: 12px; border: 1.5px solid var(--line); border-radius: 10px; background: var(--surface); }
 .dpl { list-style: none; margin: 0; padding: 0; display: grid; gap: 10px; }
@@ -514,6 +521,7 @@ body:has(#view-cart:not([hidden]) .cartsum) .toast { bottom: calc(148px + env(sa
       <p class="msg" id="form-msg" role="alert"></p>
       <div class="actions-row">
         <button type="submit" class="btn primary" id="save">Enregistrer</button>
+        <button type="submit" class="btn" id="save-cart">🛒 Enregistrer et mettre au panier</button>
         <button type="button" class="btn" id="cancel" hidden>Annuler</button>
       </div>
     </form>
@@ -537,7 +545,7 @@ body:has(#view-cart:not([hidden]) .cartsum) .toast { bottom: calc(148px + env(sa
         </div>
       </form>
       <datalist id="names"></datalist>
-      <div class="actions-row"><button type="button" class="btn small" id="rcpt-btn">🧾 Importer un ticket (photo ou PDF)</button><button type="button" class="btn small" id="imp-open">Coller un message de courses</button></div>
+      <div class="actions-row"><button type="button" class="btn small" id="rcpt-btn">🧾 Importer un ticket (photo ou PDF)</button><button type="button" class="btn small lot-open">💶 Achat global (montant)</button><button type="button" class="btn small" id="imp-open">Coller un message de courses</button></div>
       <div class="imp" id="imp" hidden>
         <div class="field">
           <label for="imp-text">Message reçu</label>
@@ -555,6 +563,7 @@ body:has(#view-cart:not([hidden]) .cartsum) .toast { bottom: calc(148px + env(sa
   </section>
 
   <section id="view-spend" class="panel" role="tabpanel" aria-labelledby="tab-spend" hidden>
+    <div class="actions-row"><button type="button" class="btn small lot-open">💶 Ajouter un achat global (montant)</button></div>
     <div class="seg" id="spend-period" role="group" aria-label="Période">
       <button type="button" data-p="month" aria-pressed="true">Ce mois</button>
       <button type="button" data-p="30" aria-pressed="false">30 jours</button>
@@ -702,13 +711,36 @@ body:has(#view-cart:not([hidden]) .cartsum) .toast { bottom: calc(148px + env(sa
 </section>
 
 <div class="help-back" id="dup-back" hidden></div>
-<section class="help" id="dup-sheet" role="dialog" aria-modal="true" aria-labelledby="dup-t" hidden>
+<section class="help" id="dup-sheet" role="dialog" aria-modal="true" aria-labelledby="dpl-t" hidden>
   <div class="help-head">
-    <h2 id="dup-t">🔀 Doublons possibles</h2>
+    <h2 id="dpl-t">🔀 Doublons possibles</h2>
     <button type="button" class="ib" id="dup-close" aria-label="Fermer"><svg class="ic" aria-hidden="true"><use href="#i-close"/></svg></button>
   </div>
   <p class="scan-note">Un produit = un seul nom, avec plusieurs références (magasin, prix, format). Rien n'est fusionné sans votre accord, et vous pouvez annuler.</p>
   <div id="dup-body"></div>
+</section>
+<div class="help-back" id="lot-back" hidden></div>
+<section class="help" id="lot-sheet" role="dialog" aria-modal="true" aria-labelledby="lot-t" hidden>
+  <div class="help-head">
+    <h2 id="lot-t">💶 Achat global</h2>
+    <button type="button" class="ib" id="lot-close" aria-label="Fermer"><svg class="ic" aria-hidden="true"><use href="#i-close"/></svg></button>
+  </div>
+  <p class="scan-note">Un montant pour tout un achat, sans poids ni détail (par exemple « viande · 23,40 € »). Vous pouvez joindre des produits de la base, c'est facultatif. Les prix de la base ne changent pas.</p>
+  <div class="field"><label for="lot-amount">Montant payé (€) <span class="req">*</span></label><input type="text" id="lot-amount" inputmode="decimal" autocomplete="off" placeholder="23,40"></div>
+  <div class="field"><label for="lot-name">Libellé (facultatif)</label><input type="text" id="lot-name" autocomplete="off" placeholder="Ex. Viande, Marché, Légumes"></div>
+  <div class="field"><span class="lbl">Produits concernés (facultatif)</span>
+    <input type="search" id="lot-q" placeholder="Chercher dans la base : poulet, kebab…" autocomplete="off">
+    <div class="chips" id="lot-sugg"></div>
+    <div class="chips" id="lot-sel"></div>
+  </div>
+  <div class="row2">
+    <div class="field"><label for="lot-place">Lieu</label><input type="text" id="lot-place" list="places" autocomplete="off" placeholder="Ex. Aldi"></div>
+    <div class="field"><label for="lot-date">Date</label><input type="date" id="lot-date"></div>
+  </div>
+  <div class="chips" id="lot-chips"></div>
+  <div class="field"><label for="lot-cat">Rayon</label><select id="lot-cat"></select></div>
+  <p class="msg" id="lot-msg" role="alert"></p>
+  <button type="button" class="btn primary big" id="lot-save">Enregistrer l'achat</button>
 </section>
 <div class="help-back" id="set-back" hidden></div>
 <section class="help" id="set-sheet" role="dialog" aria-modal="true" aria-labelledby="set-t" hidden>
@@ -865,7 +897,7 @@ body:has(#view-cart:not([hidden]) .cartsum) .toast { bottom: calc(148px + env(sa
   }
   function updateSaveBtn() {
     var b = $('#save');
-    b.disabled = mode === 'pending';
+    b.disabled = mode === 'pending'; var sc = $('#save-cart'); if (sc) sc.disabled = mode === 'pending';
     b.textContent = mode === 'pending' ? 'Chargement…' : (editId ? 'Enregistrer les modifications' : 'Enregistrer');
   }
   function persistLocal() { try { localStorage.setItem(LS_KEY, JSON.stringify(items)); } catch (e) { toast('Sauvegarde impossible sur cet appareil.'); } }
@@ -917,6 +949,11 @@ body:has(#view-cart:not([hidden]) .cartsum) .toast { bottom: calc(148px + env(sa
     setMode('local');
     purchases.local(); basket.local();
     renderAll();
+  }
+  function cartAfterSave(rec, id) {
+    var it = id ? items.find(function (x) { return x.id === id; }) : null;
+    if (!it) it = items.find(function (x) { return x.createdAt === rec.createdAt && x.name === rec.name && (x.place || '') === (rec.place || ''); }) || items.find(function (x) { return x.name === rec.name && (x.place || '') === (rec.place || ''); });
+    return it ? addToBasket(it, it.name, 1, null, false) : Promise.resolve(false);
   }
   function putItem(rec, id) {
     if (mode === 'db' && col) { return (id ? col.doc(id) : col.doc()).set(rec); }
@@ -1033,6 +1070,7 @@ body:has(#view-cart:not([hidden]) .cartsum) .toast { bottom: calc(148px + env(sa
 
   $('#form').addEventListener('submit', function (e) {
     e.preventDefault();
+    var toCart = e.submitter ? e.submitter.id === 'save-cart' : !!(pendingDup && pendingDup.toCart);
     var msg = $('#form-msg'); msg.textContent = '';
     var name = F.name.value.replace(/\s+/g, ' ').trim();
     var price = num(F.price.value);
@@ -1070,7 +1108,7 @@ body:has(#view-cart:not([hidden]) .cartsum) .toast { bottom: calc(148px + env(sa
     if (!editId && !dupOk) {
       var dup = findDup(rec);
       if (dup) {
-        pendingDup = { dup: dup, rec: rec };
+        pendingDup = { dup: dup, rec: rec, toCart: toCart };
         $('#dup-t').textContent = 'Déjà enregistré : ' + dup.name + (dup.place ? ' · ' + dup.place : '') + ' · ' + eur.format(dup.price) + (dup.date ? ' (' + fmtDate(dup.date) + ')' : '') + '. Mettre à jour ce relevé, ou ajouter un nouveau ?';
         $('#dup').hidden = false; return;
       }
@@ -1078,8 +1116,8 @@ body:has(#view-cart:not([hidden]) .cartsum) .toast { bottom: calc(148px + env(sa
     dupOk = false;
     var id = editId, wasEdit = !!editId;
     $('#save').disabled = true;
-    putItem(rec, id).then(function () {
-      toast(wasEdit ? 'Relevé modifié' : 'Prix enregistré');
+    putItem(rec, id).then(function () { return toCart ? cartAfterSave(rec, id) : false; }).then(function (added) {
+      toast((wasEdit ? 'Relevé modifié' : 'Prix enregistré') + (added ? ' · au panier 🛒' : ''));
       if (wasEdit) { resetForm(true); setView('search'); $('#q').value = name; renderAll(); }
       else { resetForm(true); F.name.focus(); }
     }).catch(function () {
@@ -1188,12 +1226,12 @@ body:has(#view-cart:not([hidden]) .cartsum) .toast { bottom: calc(148px + env(sa
   }
   $('#dup').addEventListener('click', function (e) {
     var b = e.target.closest('button[data-act]'); if (!b || !pendingDup) return;
-    var act = b.getAttribute('data-act'), d = pendingDup.dup, r = pendingDup.rec;
+    var act = b.getAttribute('data-act'), d = pendingDup.dup, r = pendingDup.rec, tc = pendingDup.toCart;
     $('#dup').hidden = true;
     if (act === 'dup-keep') { dupOk = true; $('#form').dispatchEvent(new Event('submit', { bubbles: true, cancelable: true })); }
     else if (act === 'dup-update') {
       var r2 = Object.assign({}, r, { verdict: r.verdict || d.verdict || '', why: r.verdict ? r.why : (d.why || ''), createdAt: d.createdAt || r.createdAt, example: false, history: d.price !== r.price ? pushHist(d, r.price) : histOf(d) });
-      putItem(r2, d.id).then(function () { toast('Relevé mis à jour'); resetForm(true); }).catch(function () { $('#form-msg').textContent = 'Enregistrement refusé.'; });
+      putItem(r2, d.id).then(function () { return tc ? cartAfterSave(r2, d.id) : false; }).then(function (added) { toast('Relevé mis à jour' + (added ? ' · au panier 🛒' : '')); resetForm(true); }).catch(function () { $('#form-msg').textContent = 'Enregistrement refusé.'; });
     }
     pendingDup = null;
   });
@@ -1479,9 +1517,12 @@ body:has(#view-cart:not([hidden]) .cartsum) .toast { bottom: calc(148px + env(sa
       return;
     }
     var best = bestMap();
+    var order = [], byK = {};
+    res.forEach(function (it) { var k = key(it.name) || it.name; if (!byK[k]) { byK[k] = []; order.push(k); } byK[k].push(it); });
+    var nProd = order.length, anyGroup = order.some(function (k) { return byK[k].length > 1; });
     var withU = res.filter(function (r) { return r.unitPrice != null; });
     var groups = Array.from(new Set(withU.map(function (r) { return r.group; })));
-    var s = res.length + (res.length > 1 ? ' relevés' : ' relevé');
+    var s = anyGroup ? nProd + (nProd > 1 ? ' produits' : ' produit') + ' · ' + res.length + ' relevés' : res.length + (res.length > 1 ? ' relevés' : ' relevé');
     if (q && withU.length && groups.length === 1) {
       var m = withU.reduce(function (a, b) { return b.unitPrice < a.unitPrice ? b : a; });
       s += ' · le moins cher : <strong>' + esc(eur.format(m.unitPrice)) + ' / ' + GS[m.group] + '</strong>' + (m.place ? ' chez ' + esc(m.place) : '');
@@ -1493,8 +1534,13 @@ body:has(#view-cart:not([hidden]) .cartsum) .toast { bottom: calc(148px + env(sa
       if (buyers.length) s += '<br>À acheter : ' + fmtV(buyers);
       if (avoiders.length) s += '<br>À éviter : ' + fmtV(avoiders);
     }
+    dupFocus = [];
+    if (q && nProd > 1) {
+      var dg = dupGroups().filter(function (g) { return g.filter(function (pp) { return byK[pp.key]; }).length > 1; })[0];
+      if (dg) { dupFocus = dg.map(function (pp) { return pp.key; }); s += '<br><button type="button" class="chip pick" data-act="dp-open-s">🔀 Ces produits se ressemblent : les fusionner ?</button>'; }
+    }
     summary.innerHTML = s;
-    list.innerHTML = res.map(function (it) {
+    var cardFor = function (it, grouped) {
       var k = key(it.name) + '|' + it.group;
       var isBest = it.unitPrice != null && best[k] != null && it.unitPrice === best[k];
       var chips = [];
@@ -1509,7 +1555,7 @@ body:has(#view-cart:not([hidden]) .cartsum) .toast { bottom: calc(148px + env(sa
       if (it.manual) chips.push('<span class="chip">prix au ' + GL[it.group] + ' saisi</span>');
       if (it.example) chips.push('<span class="chip">exemple</span>');
       if (histOf(it).length) chips.push('<button type="button" class="chip pick" data-act="hist" aria-label="Historique des prix">📈 ' + (histOf(it).length + 1) + ' prix</button>');
-      var meta = [it.place, fmtDate(it.date)].filter(Boolean).join(' · ');
+      var meta = (grouped ? [fmtDate(it.date)] : [it.place, fmtDate(it.date)]).filter(Boolean).join(' · ');
       var unitTxt = it.unitPrice != null ? eur.format(it.unitPrice) + ' / ' + GS[it.group] : '— / ' + GS[it.group];
       var promoLine = '';
       if (it.promo && it.regularPrice != null) {
@@ -1518,8 +1564,8 @@ body:has(#view-cart:not([hidden]) .cartsum) .toast { bottom: calc(148px + env(sa
           ' · économie <strong>' + Math.round((1 - it.price / it.regularPrice) * 100) + ' %</strong></p>';
       }
       var vIcon = it.verdict === 'buy' ? '<span class="vi buy">' + ICON('thumb') + '</span>' : it.verdict === 'avoid' ? '<span class="vi avoid">' + ICON('warn') + '</span>' : '';
-      return '<li class="card" data-id="' + esc(it.id) + '">' +
-        '<div class="main"><h3>' + vIcon + esc(it.name) + (it.brand ? ' <span class="brand">' + esc(it.brand) + '</span>' : '') + '</h3>' +
+      return '<li class="card' + (grouped ? ' inpg' : '') + '" data-id="' + esc(it.id) + '">' +
+        '<div class="main"><h3>' + vIcon + esc(grouped ? (it.place || 'Lieu non précisé') : it.name) + (it.brand ? ' <span class="brand">' + esc(it.brand) + '</span>' : '') + '</h3>' +
         (meta ? '<p class="meta">' + esc(meta) + '</p>' : '') +
         (chips.length ? '<div class="chips">' + chips.join('') + '</div>' : '') +
         promoLine +
@@ -1531,8 +1577,18 @@ body:has(#view-cart:not([hidden]) .cartsum) .toast { bottom: calc(148px + env(sa
         (openMenu === it.id ? '<div class="acts menu"><span class="grp">' + ib('tag-buy', 'thumb', 'À acheter ici', 'buy', it.verdict === 'buy') + ib('tag-avoid', 'warn', 'À éviter ici', 'avoid', it.verdict === 'avoid') + ib('reprice', 'cash', 'Changer le prix', '') + '</span>' +
           '<span class="grp sp">' + ib('edit', 'pencil', 'Modifier', '') + ib('del', 'trash', 'Supprimer', 'del') + '</span></div>' : '') +
         whyPanel(it) + repricePanel(it) + histPanel(it) + '</li>';
+    };
+    list.innerHTML = order.map(function (k) {
+      var g = byK[k];
+      if (g.length === 1) return cardFor(g[0], false);
+      var wu = g.filter(function (x) { return x.unitPrice != null; }), gs = Array.from(new Set(wu.map(function (x) { return x.group; })));
+      var top = wu.length && gs.length === 1 ? wu.reduce(function (a, b) { return b.unitPrice < a.unitPrice ? b : a; }) : null;
+      return '<li class="pgroup"><div class="pg-head"><h3>' + esc(g[0].name) + '</h3><p class="meta">' + g.length + ' références' + (g[0].cat ? ' · ' + esc(g[0].cat) : '') + '</p>' +
+        (top ? '<p class="pg-best">Moins cher : <strong>' + esc(eur.format(top.unitPrice)) + ' / ' + esc(GS[top.group]) + '</strong>' + (top.place ? ' chez <strong>' + esc(top.place) + '</strong>' : '') + '</p>' : '') + '</div>' +
+        '<ul class="list sub">' + g.map(function (x) { return cardFor(x, true); }).join('') + '</ul></li>';
     }).join('');
   }
+  $('#summary').addEventListener('click', function (e) { if (e.target.closest('[data-act="dp-open-s"]')) openDup(); });
 
   // ---------- Panier ----------
   // ----- Promos : prix normal pour 1, puis remise selon le nombre d'articles -----
@@ -2768,6 +2824,57 @@ body:has(#view-cart:not([hidden]) .cartsum) .toast { bottom: calc(148px + env(sa
     });
     return { total: cents(total), rows: Object.keys(agg).map(function (k) { return agg[k]; }).sort(function (a, b) { return b.sv - a.sv; }).slice(0, 3) };
   }
+  // ---------- Achat global : un montant pour un achat, sans poids ni détail ----------
+  var lotSel = [];
+  function lotRender() {
+    var q = norm($('#lot-q').value.trim());
+    var sg = q ? productList().filter(function (e) { return norm(e.name).indexOf(q) >= 0 && lotSel.indexOf(e.name) < 0; }).slice(0, 8) : [];
+    $('#lot-sugg').innerHTML = sg.map(function (e) { return '<button type="button" class="chip pick" data-lot-add="' + esc(e.name) + '">+ ' + esc(e.name) + '</button>'; }).join('');
+    $('#lot-sel').innerHTML = lotSel.map(function (n, i) { return '<button type="button" class="chip pick on" data-lot-del="' + i + '" aria-label="Retirer ' + esc(n) + '">' + esc(n) + ' ✕</button>'; }).join('');
+    var pl = $('#lot-place').value.trim();
+    $('#lot-chips').innerHTML = knownPlaces().slice(0, 8).map(function (p) { return '<button type="button" class="chip pick' + (key(p) === key(pl) ? ' on' : '') + '" data-lot-place="' + esc(p) + '">' + esc(p) + '</button>'; }).join('');
+  }
+  function openLot() {
+    lotSel = []; $('#lot-amount').value = ''; $('#lot-name').value = ''; $('#lot-q').value = ''; $('#lot-msg').textContent = ''; $('#lot-date').value = today(0);
+    $('#lot-place').value = (function () { try { return localStorage.getItem('prix-rayon-lot-place') || ''; } catch (e) { return ''; } })();
+    $('#lot-cat').innerHTML = '<option value="">Rayon (automatique)</option>' + CATS.map(function (c) { return '<option value="' + esc(c) + '">' + esc(c) + '</option>'; }).join('');
+    lotRender(); $('#lot-sheet').hidden = false; $('#lot-back').hidden = false;
+    setTimeout(function () { $('#lot-amount').focus(); }, 60);
+  }
+  function closeLot() { $('#lot-sheet').hidden = true; $('#lot-back').hidden = true; }
+  Array.prototype.forEach.call(document.querySelectorAll('.lot-open'), function (b) { b.addEventListener('click', openLot); });
+  $('#lot-close').addEventListener('click', closeLot);
+  $('#lot-back').addEventListener('click', closeLot);
+  document.addEventListener('keydown', function (e) { if (e.key === 'Escape' && !$('#lot-sheet').hidden) closeLot(); });
+  $('#lot-q').addEventListener('input', lotRender);
+  $('#lot-place').addEventListener('input', lotRender);
+  $('#lot-sheet').addEventListener('click', function (e) {
+    var a = e.target.closest('[data-lot-add]'), d = e.target.closest('[data-lot-del]'), pl = e.target.closest('[data-lot-place]');
+    if (a) { lotSel.push(a.getAttribute('data-lot-add')); $('#lot-q').value = ''; lotRender(); }
+    else if (d) { lotSel.splice(parseInt(d.getAttribute('data-lot-del'), 10), 1); lotRender(); }
+    else if (pl) { $('#lot-place').value = pl.getAttribute('data-lot-place'); lotRender(); }
+  });
+  $('#lot-save').addEventListener('click', function () {
+    var msg = $('#lot-msg'); msg.textContent = '';
+    if (!ready()) return;
+    var amount = num($('#lot-amount').value), label = $('#lot-name').value.replace(/\s+/g, ' ').trim();
+    if (amount == null || !(amount > 0)) { msg.textContent = 'Indiquez le montant payé, par exemple 23,40.'; $('#lot-amount').focus(); return; }
+    if (!label && !lotSel.length) { msg.textContent = 'Indiquez un libellé (ex. Viande) ou choisissez au moins un produit.'; $('#lot-name').focus(); return; }
+    var name = (label || lotSel.join(', ')).slice(0, 90), place = $('#lot-place').value.trim(), cat = $('#lot-cat').value;
+    if (!cat && lotSel.length) {
+      var cn = {}; items.forEach(function (x) { if (x.cat && lotSel.some(function (n) { return key(n) === key(x.name); })) cn[x.cat] = (cn[x.cat] || 0) + 1; });
+      cat = Object.keys(cn).sort(function (a, b) { return cn[b] - cn[a]; })[0] || '';
+    }
+    if (!cat) cat = guessCat(label || lotSel[0] || '') || '';
+    amount = cents(amount);
+    var rec = { name: name, brand: '', place: place, cat: cat, price: amount, count: 1, total: amount, date: $('#lot-date').value || today(0), promo: false, regularPrice: null, itemId: '', createdAt: Date.now(), deal: null, saved: 0, lot: true, lotItems: lotSel.slice() };
+    try { localStorage.setItem('prix-rayon-lot-place', place); } catch (e) {}
+    purchases.put(rec).then(function () {
+      closeLot(); toast('Achat global enregistré : ' + eur.format(amount) + (place ? ' · ' + place : ''));
+      setView('spend');
+    }).catch(function () { msg.textContent = 'Enregistrement refusé.'; });
+  });
+
   var spendAuto = false;
   $('#spend-body').addEventListener('click', function (e) { var b = e.target.closest('button[data-sp]'); if (!b) return; var t = $('#spend-period button[data-p="' + b.getAttribute('data-sp') + '"]'); if (t) t.click(); });
   function renderSpend() {
@@ -2846,7 +2953,7 @@ body:has(#view-cart:not([hidden]) .cartsum) .toast { bottom: calc(148px + env(sa
           '<button type="button" class="ib" data-act="pur-reopen" data-key="' + esc(k) + '" aria-label="Rouvrir ce ticket dans le panier pour le compléter" title="Rouvrir dans le panier pour compléter">' + ICON('cart') + '</button></div>' +
           '<ul class="list">' + g.ps.map(function (p) {
             return '<li class="card pur" data-id="' + esc(p.id) + '"><div class="main"><h3>' + esc(p.name) + ' <span class="brand">× ' + (p.count || 1) + (p.count > 1 ? ' à ' + esc(eur.format(p.price)) : '') + '</span></h3>' +
-              '<p class="meta">' + esc([p.cat || '', p.deal ? '🏷️ ' + dealLabel(p.deal) : ''].filter(Boolean).join(' · ')) + '</p></div><span class="amt">' + esc(eur.format(ptotal(p))) + '</span>' +
+              '<p class="meta">' + esc([p.lot ? 'achat global' + (p.lotItems && p.lotItems.length && p.name !== p.lotItems.join(', ') ? ' : ' + p.lotItems.join(', ') : '') : '', p.cat || '', p.deal ? '🏷️ ' + dealLabel(p.deal) : ''].filter(Boolean).join(' · ')) + '</p></div><span class="amt">' + esc(eur.format(ptotal(p))) + '</span>' +
               '<div class="acts"><span class="grp sp">' + ib('pur-edit', 'pencil', 'Modifier cet achat', '') + ib('pur-del', 'trash', 'Supprimer l\'achat', 'del') + '</span></div>' + purEdit(p) + '</li>';
           }).join('') + '</ul>';
       }).join('');
@@ -2988,7 +3095,7 @@ body:has(#view-cart:not([hidden]) .cartsum) .toast { bottom: calc(148px + env(sa
     Array.prototype.forEach.call(document.querySelectorAll('[data-act="rcl-apply"]'), function (b) { b.textContent = 'Reclasser ' + on + (on > 1 ? ' produits' : ' produit') + ' en Apéro'; b.disabled = !on; });
   });
   // ---------- Doublons possibles & fusion (un produit = un nom, plusieurs références) ----------
-  var DUP_IGN = 'prix-rayon-dup-ignore', DUP_UNDO = 'prix-rayon-dup-undo', dupCache = [];
+  var dupFocus = [], DUP_IGN = 'prix-rayon-dup-ignore', DUP_UNDO = 'prix-rayon-dup-undo', dupCache = [];
   var DUP_STOP = ['marque', 'type', 'petit', 'petite', 'maxi', 'mini', 'format', 'classic', 'classique', 'simple', 'eco', 'grand', 'grande', 'x'];
   function dupToks(name) { return tokens(name).filter(function (t) { return DUP_STOP.indexOf(t) < 0 && !/^x?\d+[a-z%]*$/.test(t); }); }
   function dupSim(A, B) {
@@ -3020,7 +3127,7 @@ body:has(#view-cart:not([hidden]) .cartsum) .toast { bottom: calc(148px + env(sa
   }
   function dupUndoRec() { try { return JSON.parse(localStorage.getItem(DUP_UNDO) || 'null'); } catch (e) { return null; } }
   function renderDupSheet(msg) {
-    dupCache = dupGroups();
+    dupCache = dupGroups().sort(function (a, b) { var fa = a.some(function (p) { return dupFocus.indexOf(p.key) >= 0; }), fb = b.some(function (p) { return dupFocus.indexOf(p.key) >= 0; }); return (fb ? 1 : 0) - (fa ? 1 : 0); });
     var h = msg ? '<p class="msg ok" role="status">' + esc(msg) + '</p>' : '';
     if (!dupCache.length) h += '<p class="meta">Aucun doublon possible pour le moment.</p>';
     dupCache.forEach(function (grp, g) {
