@@ -68,7 +68,7 @@ button { cursor: pointer; }
 .topbar { position: sticky; top: env(safe-area-inset-top, 0px); z-index: 30; display: flex; align-items: center; justify-content: space-between; gap: 8px; background: var(--bg); padding-block: 8px; }
 .brand-t { font: 700 26px/1 var(--font-num); letter-spacing: .04em; text-transform: uppercase; }
 .help-fab { flex: none; width: 40px; height: 40px; padding: 0; border-radius: 50%; border: 2px solid var(--ink); background: var(--ink); color: var(--bg); font: 700 24px/1 var(--font-num); }
-.tabs { position: fixed; z-index: 30; left: 0; right: 0; bottom: 0; display: grid; grid-template-columns: repeat(4, 1fr); background: var(--surface); border-top: 2px solid var(--ink); padding-bottom: env(safe-area-inset-bottom, 0px); padding-left: env(safe-area-inset-left, 0px); padding-right: env(safe-area-inset-right, 0px); }
+.tabs { position: fixed; z-index: 30; left: 0; right: 0; bottom: 0; display: grid; grid-template-columns: repeat(5, 1fr); background: var(--surface); border-top: 2px solid var(--ink); padding-bottom: env(safe-area-inset-bottom, 0px); padding-left: env(safe-area-inset-left, 0px); padding-right: env(safe-area-inset-right, 0px); }
 .tabs button { position: relative; min-height: 62px; display: grid; justify-items: center; align-content: center; gap: 2px; background: transparent; border: 0; font-size: 11px; font-weight: 600; color: var(--muted); padding: 4px 0; }
 .tabs button .ic { width: 26px; height: 26px; }
 .tabs button .nl { font-size: 12px; line-height: 1.1; white-space: nowrap; }
@@ -96,6 +96,27 @@ details.more > .panel { padding: 12px; }
 .chip.pick.on { background: var(--ink); color: var(--bg); border-color: var(--ink); }
 .sugg { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
 .chip.pick.same { border-color: var(--accent); }
+/* ── Prédictions ── */
+.predict-info { font-size: 13px; color: var(--muted); margin: 0 0 12px; }
+.pred-card { border: 1.5px solid var(--line); border-radius: 10px; padding: 12px 14px; margin-bottom: 10px; background: var(--surface); }
+.pred-card.pred-overdue { border-color: var(--danger); background: var(--bad-bg); }
+.pred-card.pred-soon { border-color: var(--accent); }
+.pred-top { display: flex; justify-content: space-between; align-items: flex-start; gap: 8px; margin-bottom: 6px; }
+.pred-name { font-weight: 700; font-size: 15px; flex: 1; }
+.pred-when { font-size: 13px; font-weight: 700; white-space: nowrap; }
+.pred-when.pred-overdue { color: var(--danger); }
+.pred-when.pred-soon { color: var(--accent); }
+.pred-when.pred-later { color: var(--muted); }
+.pred-meta { display: flex; flex-wrap: wrap; gap: 6px 10px; font-size: 12px; color: var(--muted); align-items: center; margin-bottom: 6px; }
+.pred-place { font-style: italic; }
+.pred-interval, .pred-count { }
+.conf-high { color: var(--good, #2a8c4a); font-size: 13px; letter-spacing: 1px; }
+.conf-mid { color: var(--muted); font-size: 13px; letter-spacing: 1px; }
+.conf-low { color: var(--danger); font-size: 13px; letter-spacing: 1px; opacity: .7; }
+.pred-actions { margin-top: 8px; }
+.pred-cart { font-size: 13px; }
+.pred-in-cart { color: var(--good, #2a8c4a); font-weight: 700; margin-left: 4px; }
+/* ── /Prédictions ── */
 .invalid { border-color: var(--danger) !important; background: var(--bad-bg) !important; }
 .req { color: var(--danger); }
 .imp-line.err { border-color: var(--danger); background: var(--bad-bg); }
@@ -562,6 +583,15 @@ body:has(#view-cart:not([hidden]) .cartsum) .toast { bottom: calc(148px + env(sa
     <div id="cart-body" class="panel"></div>
   </section>
 
+  <section id="view-predict" class="panel" role="tabpanel" aria-labelledby="tab-predict" hidden>
+    <div class="seg" id="predict-horizon" role="group" aria-label="Horizon">
+      <button type="button" data-h="3" aria-pressed="false">3 jours</button>
+      <button type="button" data-h="7" aria-pressed="true">7 jours</button>
+      <button type="button" data-h="14" aria-pressed="false">14 jours</button>
+    </div>
+    <div id="predict-body" class="panel"></div>
+  </section>
+
   <section id="view-spend" class="panel" role="tabpanel" aria-labelledby="tab-spend" hidden>
     <div class="actions-row"><button type="button" class="btn small lot-open">💶 Ajouter un achat global (montant)</button></div>
     <div class="seg" id="spend-period" role="group" aria-label="Période">
@@ -587,6 +617,7 @@ body:has(#view-cart:not([hidden]) .cartsum) .toast { bottom: calc(148px + env(sa
   <button type="button" role="tab" id="tab-add" aria-selected="false" aria-controls="view-add" aria-label="Ajouter un prix"><span class="plus"><svg class="ic" aria-hidden="true"><use href="#i-plus"/></svg></span><span class="nl">Ajouter</span></button>
   <button type="button" role="tab" id="tab-cart" aria-selected="false" aria-controls="view-cart" aria-label="Panier"><svg class="ic" aria-hidden="true"><use href="#i-cart"/></svg><span class="nl" id="cart-lbl">Panier</span><span class="badge" id="cart-badge" hidden></span></button>
   <button type="button" role="tab" id="tab-spend" aria-selected="false" aria-controls="view-spend" aria-label="Dépenses"><svg class="ic" aria-hidden="true"><use href="#i-chart"/></svg><span class="nl">Dépenses</span></button>
+  <button type="button" role="tab" id="tab-predict" aria-selected="false" aria-controls="view-predict" aria-label="Prédictions"><svg class="ic" aria-hidden="true"><use href="#i-predict"/></svg><span class="nl">Prédire</span></button>
 </nav>
 <div class="toast" id="toast" role="status" hidden></div>
 
@@ -608,6 +639,7 @@ body:has(#view-cart:not([hidden]) .cartsum) .toast { bottom: calc(148px + env(sa
   <symbol id="i-close" viewBox="0 0 24 24"><path d="M18 6 6 18M6 6l12 12"/></symbol>
   <symbol id="i-mic" viewBox="0 0 24 24"><rect x="9" y="2" width="6" height="11" rx="3"/><path d="M5 10a7 7 0 0 0 14 0M12 19v4M8 23h8"/></symbol>
   <symbol id="i-stop" viewBox="0 0 24 24"><rect x="4" y="4" width="16" height="16" rx="2"/></symbol>
+  <symbol id="i-predict" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3.5 3.5"/><path d="M16.5 2.5A10 10 0 0 1 22 12M7.5 2.5A10 10 0 0 0 2 12"/><path d="M20 2l2 2-2 2M4 2 2 4l2 2"/></symbol>
   <symbol id="i-gear" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></symbol>
 </svg>
 
@@ -1006,7 +1038,7 @@ body:has(#view-cart:not([hidden]) .cartsum) .toast { bottom: calc(148px + env(sa
     var el = $('#toast'); el.textContent = t; el.hidden = false;
     clearTimeout(toastTimer); toastTimer = setTimeout(function () { el.hidden = true; }, 2800);
   }
-  var VIEWS = ['search', 'add', 'cart', 'spend'];
+  var VIEWS = ['search', 'add', 'cart', 'spend', 'predict'];
   function setView(v) {
     currentView = v;
     VIEWS.forEach(function (n) {
@@ -1015,6 +1047,7 @@ body:has(#view-cart:not([hidden]) .cartsum) .toast { bottom: calc(148px + env(sa
     });
     renderCartBar();
     if (v === 'add' && !editId) { $('#f-name').focus(); }
+    if (v === 'predict') { renderPredict(); }
     window.scrollTo(0, 0);
   }
   VIEWS.forEach(function (n) { $('#tab-' + n).addEventListener('click', function () { setView(n); }); });
@@ -3201,7 +3234,7 @@ body:has(#view-cart:not([hidden]) .cartsum) .toast { bottom: calc(148px + env(sa
     }
   });
 
-  function renderAll() { fillPlaces(); render(); renderDup(); renderCart(); renderSpend(); renderCartBar(); renderReclass(); if (rc && !rc.busy) { /* ne pas écraser une saisie en cours */ } }
+  function renderAll() { fillPlaces(); render(); renderDup(); renderCart(); renderSpend(); renderCartBar(); renderReclass(); if (currentView === 'predict') { renderPredict(); } if (rc && !rc.busy) { /* ne pas écraser une saisie en cours */ } }
 
   // ---------- Événements de la recherche ----------
   // Pas d'événement « change » sur la recherche : il se déclenche au toucher d'un bouton et ferait perdre le premier appui.
@@ -3832,6 +3865,177 @@ body:has(#view-cart:not([hidden]) .cartsum) .toast { bottom: calc(148px + env(sa
       vdShowReview(res, missing, 'Dictée · Gemini');
     }).catch(function (e) { rc = null; renderReceipt(); toast(fail(e)); }).then(function () { rcBusy = false; });
   });
+
+  // ─────────────────────────────────────────────────────────────
+  //  PRÉDICTIONS  (v11)
+  // ─────────────────────────────────────────────────────────────
+  var predictHorizon = 7;
+
+  // Horizon selector
+  $('#predict-horizon').addEventListener('click', function (e) {
+    var b = e.target.closest('button[data-h]');
+    if (!b) return;
+    predictHorizon = parseInt(b.getAttribute('data-h'), 10);
+    document.querySelectorAll('#predict-horizon button').forEach(function (btn) {
+      btn.setAttribute('aria-pressed', String(btn === b));
+    });
+    renderPredict();
+  });
+
+  // Add-to-cart from prediction card
+  $('#predict-body').addEventListener('click', function (e) {
+    var btn = e.target.closest('button[data-pred-id]');
+    if (!btn) return;
+    var pid = btn.getAttribute('data-pred-id');
+    var item = items.find(function (x) { return x.id === pid; });
+    if (!item) { toast('Produit introuvable dans les prix.'); return; }
+    var existing = basket.items.find(function (x) { return x.itemId === pid; });
+    if (existing) {
+      basket.patch(existing.id, { count: (existing.count || 1) + 1 });
+      toast(item.name + ' : quantité augmentée.');
+    } else {
+      basket.put({
+        itemId: item.id, name: item.name, brand: item.brand || '',
+        place: item.place, cat: item.cat, price: item.price, count: 1,
+        unit: item.unit, unitPrice: item.unitPrice, promo: item.promo,
+        done: false, createdAt: Date.now()
+      });
+      toast(item.name + ' ajouté au panier.');
+    }
+    renderCartBar();
+    renderPredict();
+  });
+
+  function renderPredict() {
+    var box = $('#predict-body');
+    if (mode === 'pending') { box.innerHTML = ''; return; }
+    var MIN_PURCHASES = 3;
+    var now = Date.now();
+    var horizonMs = predictHorizon * 86400000;
+
+    // Regroup purchases by (name + place) normalized key
+    var groups = {};
+    purchases.items.forEach(function (p) {
+      var key = (p.name || '').toLowerCase().trim() + '|' + (p.place || '').toLowerCase().trim();
+      if (!groups[key]) groups[key] = { name: p.name, place: p.place, cat: p.cat || '', dates: [], itemId: p.itemId || null };
+      var d = p.date ? new Date(p.date).getTime() : (p.createdAt || 0);
+      if (d) groups[key].dates.push(d);
+    });
+
+    var suggestions = [];
+
+    Object.values(groups).forEach(function (g) {
+      if (g.dates.length < MIN_PURCHASES) return;
+
+      // Sort chronologically
+      var dates = g.dates.slice().sort(function (a, b) { return a - b; });
+
+      // Compute intervals between consecutive purchases (in days)
+      var intervals = [];
+      for (var i = 1; i < dates.length; i++) {
+        intervals.push((dates[i] - dates[i - 1]) / 86400000);
+      }
+
+      // Weighted moving average (more recent intervals weighted more)
+      var weightedSum = 0, weightTotal = 0;
+      intervals.forEach(function (iv, idx) {
+        var w = idx + 1; // weight proportional to position (most recent = highest)
+        weightedSum += iv * w;
+        weightTotal += w;
+      });
+      var avgInterval = weightTotal > 0 ? weightedSum / weightTotal : 0;
+      if (avgInterval <= 0) return;
+
+      // Variance → confidence
+      var variance = 0;
+      intervals.forEach(function (iv) { variance += Math.pow(iv - avgInterval, 2); });
+      variance /= intervals.length;
+      var stdDev = Math.sqrt(variance);
+      var cv = stdDev / avgInterval; // coefficient of variation
+
+      // High variance = occasional/gift item → exclude (cv > 1 means very irregular)
+      if (cv > 1.0) return;
+
+      var lastDate = dates[dates.length - 1];
+      var daysSinceLast = (now - lastDate) / 86400000;
+      var daysUntilNext = avgInterval - daysSinceLast;
+
+      // Only show items expected within the selected horizon
+      if (daysUntilNext > predictHorizon) return;
+
+      // Urgency: 0 (overdue) → 1 (just predicted)
+      var urgency = daysUntilNext <= 0 ? 0 : daysUntilNext / predictHorizon;
+
+      // Confidence score (0-100): penalize high cv
+      var conf = Math.round(Math.max(0, Math.min(100, (1 - cv) * 100)));
+
+      // Find matching price entry for "add to cart" capability
+      var priceEntry = null;
+      if (g.itemId) {
+        priceEntry = items.find(function (x) { return x.id === g.itemId; });
+      }
+      if (!priceEntry) {
+        // Fuzzy match by name + place
+        priceEntry = items.find(function (x) {
+          return x.name.toLowerCase().trim() === g.name.toLowerCase().trim() &&
+                 x.place.toLowerCase().trim() === g.place.toLowerCase().trim();
+        });
+      }
+
+      suggestions.push({
+        name: g.name, place: g.place, cat: g.cat,
+        avgInterval: avgInterval, daysSinceLast: daysSinceLast,
+        daysUntilNext: daysUntilNext, urgency: urgency,
+        conf: conf, count: dates.length,
+        priceEntry: priceEntry || null
+      });
+    });
+
+    // Sort: overdue first, then by urgency ascending (most urgent first)
+    suggestions.sort(function (a, b) { return a.daysUntilNext - b.daysUntilNext; });
+
+    if (!suggestions.length) {
+      box.innerHTML = '<p class="empty">Pas encore assez de données pour prédire vos achats sur cet horizon.<br><small>Il faut au moins ' + MIN_PURCHASES + ' achats par produit avec un rythme régulier.</small></p>';
+      return;
+    }
+
+    var html = '<p class="predict-info">Basé sur vos habitudes d\'achat — ' + suggestions.length + ' produit' + (suggestions.length > 1 ? 's' : '') + ' prédit' + (suggestions.length > 1 ? 's' : '') + ' dans les ' + predictHorizon + ' prochains jours.</p>';
+
+    suggestions.forEach(function (s) {
+      var overdue = s.daysUntilNext <= 0;
+      var daysLabel = overdue
+        ? 'En retard de ' + Math.round(-s.daysUntilNext) + ' j'
+        : (Math.round(s.daysUntilNext) <= 1 ? 'Demain ou aujourd\'hui' : 'Dans ' + Math.round(s.daysUntilNext) + ' j');
+      var urgClass = overdue ? 'pred-overdue' : (s.urgency < 0.3 ? 'pred-soon' : 'pred-later');
+      var confClass = s.conf >= 70 ? 'conf-high' : (s.conf >= 40 ? 'conf-mid' : 'conf-low');
+      var confLabel = s.conf >= 70 ? '●●●' : (s.conf >= 40 ? '●●○' : '●○○');
+      var confTitle = 'Confiance ' + s.conf + '% (régularité)';
+      var cartBtn = s.priceEntry
+        ? '<button type="button" class="btn small pred-cart" data-pred-id="' + s.priceEntry.id + '" aria-label="Ajouter au panier">🛒 Panier</button>'
+        : '';
+      var inCart = s.priceEntry && basket.items.some(function (x) { return x.itemId === s.priceEntry.id; });
+      var cartMark = inCart ? ' <span class="pred-in-cart" title="Déjà dans le panier">✓</span>' : '';
+      var intervalLabel = s.avgInterval >= 7
+        ? 'tous les ~' + Math.round(s.avgInterval / 7) + ' sem.'
+        : 'tous les ~' + Math.round(s.avgInterval) + ' j';
+
+      html += '<div class="pred-card ' + urgClass + '">' +
+        '<div class="pred-top">' +
+          '<div class="pred-name">' + esc(s.name) + cartMark + '</div>' +
+          '<div class="pred-when ' + urgClass + '">' + daysLabel + '</div>' +
+        '</div>' +
+        '<div class="pred-meta">' +
+          '<span class="pred-place">' + esc(s.place) + '</span>' +
+          '<span class="pred-interval">' + intervalLabel + '</span>' +
+          '<span class="pred-count">' + s.count + ' achat' + (s.count > 1 ? 's' : '') + '</span>' +
+          '<span class="' + confClass + '" title="' + confTitle + '" aria-label="' + confTitle + '">' + confLabel + '</span>' +
+        '</div>' +
+        (cartBtn ? '<div class="pred-actions">' + cartBtn + '</div>' : '') +
+      '</div>';
+    });
+
+    box.innerHTML = html;
+  }
 
   renderAll();
 
