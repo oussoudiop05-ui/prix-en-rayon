@@ -97,7 +97,12 @@ details.more > .panel { padding: 12px; }
 .sugg { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
 .chip.pick.same { border-color: var(--accent); }
 /* ── Prédictions timeline ── */
-.pred-info { font-size: 12px; color: var(--muted); margin: 0 0 10px; text-align: center; }
+.pred-info { font-size: 12px; color: var(--muted); margin: 0 0 6px; text-align: center; }
+.pred-legend { display: flex; flex-wrap: wrap; gap: 6px 12px; justify-content: center; margin: 0 0 12px; padding: 6px 10px; background: var(--surface); border-radius: 8px; border: 1px solid var(--line); }
+.pred-legend-item { display: flex; align-items: center; gap: 4px; font-size: 11px; color: var(--muted); white-space: nowrap; }
+.pred-legend-dot { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; }
+.pred-legend-dot-ok { background: var(--good, #2a8c4a); }
+.pred-legend-dot-late { background: var(--danger); }
 /* Timeline scroll horizontal */
 .pred-timeline { display: flex; gap: 8px; overflow-x: auto; padding-bottom: 8px; scroll-snap-type: x mandatory; -webkit-overflow-scrolling: touch; }
 .pred-timeline::-webkit-scrollbar { height: 4px; }
@@ -2800,7 +2805,7 @@ body:has(#view-cart:not([hidden]) .cartsum) .toast { bottom: calc(148px + env(sa
     var end = today(0), dates = list.map(function (p) { return p.date || end; }).sort();
     if (dates.length && dates[dates.length - 1] > end) end = dates[dates.length - 1];
     if (spendPeriod === 'range' && rangeTo) end = rangeTo;
-    var start = spendPeriod === 'month' ? today(0).slice(0, 7) + '-01' : spendPeriod === '30' ? addDays(end, -30) : spendPeriod === 'range' && rangeFrom ? rangeFrom : (dates[0] || end);
+    var start = spendPeriod === 'month' ? (agMonth || today(0).slice(0, 7)) + '-01' : spendPeriod === '30' ? addDays(end, -30) : spendPeriod === 'range' && rangeFrom ? rangeFrom : (dates[0] || end);
     if (start > end) start = end;
     var days = dayDiff(start, end) + 1, monthly = days > 62, bs = [], idx = {};
     var fl = function (k, o) { return new Date(k + (k.length === 7 ? '-15' : '') + 'T12:00:00').toLocaleDateString('fr-FR', o); };
@@ -2943,7 +2948,7 @@ body:has(#view-cart:not([hidden]) .cartsum) .toast { bottom: calc(148px + env(sa
       return String(b.date || '').localeCompare(String(a.date || '')) || (b.createdAt || 0) - (a.createdAt || 0);
     });
     if (!list.length) {
-      if (spendPeriod === 'month' && !spendAuto) { spendAuto = true; var b30 = $('#spend-period button[data-p="30"]'); if (b30) { b30.click(); return; } }
+      if (spendPeriod === 'month' && !spendAuto && !agMonth) { spendAuto = true; var b30 = $('#spend-period button[data-p="30"]'); if (b30) { b30.click(); return; } }
       box.innerHTML = '<div class="empty"><h2>Rien sur cette période</h2><p>Vos ' + purchases.items.length + ' achats sont bien enregistrés, mais aucun ne tombe dans cette période.</p>' +
         '<div class="actions-row"><button type="button" class="btn small primary" data-sp="30">Voir les 30 derniers jours</button><button type="button" class="btn small" data-sp="all">Tout afficher</button></div></div>';
       return;
@@ -3032,7 +3037,7 @@ body:has(#view-cart:not([hidden]) .cartsum) .toast { bottom: calc(148px + env(sa
   }
   $('#spend-period').addEventListener('click', function (e) {
     var b = e.target.closest('button[data-p]'); if (!b) return;
-    spendPeriod = b.getAttribute('data-p'); agMonth = null; agSel = null;
+    spendPeriod = b.getAttribute('data-p'); agMonth = null; agSel = null; spendAuto = false;
     Array.prototype.forEach.call($('#spend-period').querySelectorAll('button'), function (x) { x.setAttribute('aria-pressed', String(x === b)); });
     $('#spend-range').hidden = spendPeriod !== 'range';
     if (spendPeriod === 'range' && !rangeFrom && !rangeTo) { rangeFrom = today(30); rangeTo = today(0); }
@@ -3058,7 +3063,7 @@ body:has(#view-cart:not([hidden]) .cartsum) .toast { bottom: calc(148px + env(sa
     if (act === 'ag-prev' || act === 'ag-next') {
       var yy = +agMonth.slice(0, 4), mm = +agMonth.slice(5, 7) + (act === 'ag-next' ? 1 : -1);
       if (mm < 1) { mm = 12; yy--; } if (mm > 12) { mm = 1; yy++; }
-      agMonth = yy + '-' + String(mm).padStart(2, '0'); agSel = null; renderSpend(); return;
+      agMonth = yy + '-' + String(mm).padStart(2, '0'); agSel = null; spendAuto = false; renderSpend(); return;
     }
     if (act === 'cat-guess') {
       if (!ready()) return;
@@ -4000,7 +4005,14 @@ body:has(#view-cart:not([hidden]) .cartsum) .toast { bottom: calc(148px + env(sa
       '</div>';
     }
 
-    var html = '<p class="pred-info">Basé sur vos habitudes · ' + suggestions.length + ' produit' + (suggestions.length > 1 ? 's' : '') + ' prévu' + (suggestions.length > 1 ? 's' : '') + '</p>';
+    var html = '<p class="pred-info">Basé sur vos habitudes · ' + suggestions.length + ' produit' + (suggestions.length > 1 ? 's' : '') + ' prévu' + (suggestions.length > 1 ? 's' : '') + '</p>' +
+      '<div class="pred-legend">' +
+        '<span class="pred-legend-item"><span class="conf-high">●●●</span> Régulier — fiable</span>' +
+        '<span class="pred-legend-item"><span class="conf-mid">●●○</span> Assez régulier</span>' +
+        '<span class="pred-legend-item"><span class="conf-low">●○○</span> Irrégulier — indicatif</span>' +
+        '<span class="pred-legend-item pred-legend-color"><span class="pred-legend-dot pred-legend-dot-ok"></span> Dans les délais</span>' +
+        '<span class="pred-legend-item pred-legend-color"><span class="pred-legend-dot pred-legend-dot-late"></span> En retard</span>' +
+      '</div>';
 
     // ── Retards (daysUntilNext < 0) → ligne en haut ──
     var overdue = suggestions.filter(function (s) { return s.daysUntilNext <= 0; });
