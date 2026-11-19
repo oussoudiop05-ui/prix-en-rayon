@@ -2,6 +2,19 @@
 
 Chaque version : nom, date, session Claude, description des modifications.
 
+## v12 — « Timeline prédictions & correctif Dépenses » (19 nov. 2026)
+Session : https://claude.ai/code/session_01EvniZ57G7WZk9pTAk6Ycce
+
+**Correctif**
+- **Dépenses — navigation mensuelle** : la fonction `inPeriod()` comparait toujours au mois courant (`today(0).slice(0,7)`) au lieu d'utiliser `agMonth`. Résultat : les achats des mois précédents n'apparaissaient pas quand on reculait avec la flèche ‹. Correction : `d.slice(0,7) === (agMonth || today(0).slice(0,7))`.
+
+**Prédictions — refonte de l'affichage (Option A : timeline)**
+- Remplacement de la vue en cartes par une **timeline horizontale à défilement** (scroll-snap).
+- **3j / 7j** : une colonne par jour ; **14j** : colonnes groupées par semaine.
+- Les articles **en retard** (date estimée dépassée) apparaissent dans une **ligne rouge fixe** en haut de la timeline, indépendamment de l'horizon sélectionné.
+- Chaque suggestion reste cliquable pour ajouter au panier (bouton 🛒) ; indicateur ✓ si déjà dans le panier.
+- Score de confiance (●●● / ●●○ / ●○○) et numéro de jour conservés sur chaque chip.
+
 ## v11 — « Prédictions d'achats » (19 nov. 2026)
 Session : https://claude.ai/code/session_01EvniZ57G7WZk9pTAk6Ycce
 
