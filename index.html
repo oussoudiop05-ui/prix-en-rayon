@@ -763,7 +763,7 @@ body:has(#view-cart:not([hidden]) .cartsum) .toast { bottom: calc(148px + env(sa
   </div>
   <div class="settings-section">
     <h3>ℹ️ Version</h3>
-    <p class="scan-note"><strong>v9 · « Un produit, plusieurs références »</strong><br>8 nov. 2026 · Fusion des doublons, achat global, produit groupé en recherche, panier par référence. Détail : CHANGELOG.md sur GitHub.</p>
+    <p class="scan-note"><strong>v10 · « Export JSON direct »</strong><br>19 nov. 2026 · Téléchargement natif de la sauvegarde JSON, bouton Copier le JSON. Détail : CHANGELOG.md sur GitHub.</p>
   </div>
   <div class="settings-section">
     <h3>🌙 Thème</h3>
@@ -777,12 +777,15 @@ body:has(#view-cart:not([hidden]) .cartsum) .toast { bottom: calc(148px + env(sa
     <div class="actions-row">
       <button type="button" class="btn small" id="exp-csv">Prix CSV (Excel)</button>
       <button type="button" class="btn small" id="exp-pur">Achats CSV</button>
-      <button type="button" class="btn small" id="exp-json">Sauvegarde JSON</button>
+      <button type="button" class="btn small primary" id="exp-json">⬇ Sauvegarde JSON</button>
     </div>
     <p class="scan-note" id="exp-note" aria-live="polite"></p>
     <div id="exp-fallback" hidden>
       <textarea id="exp-text" readonly aria-label="Contenu exporté"></textarea>
-      <div class="actions-row"><button type="button" class="btn small" id="exp-copy">Copier le texte</button></div>
+      <div class="actions-row">
+        <button type="button" class="btn small primary" id="exp-copy-json">📋 Copier le JSON</button>
+        <button type="button" class="btn small" id="exp-copy">Copier le texte</button>
+      </div>
     </div>
   </div>
   <div class="settings-section">
@@ -3314,24 +3317,51 @@ body:has(#view-cart:not([hidden]) .cartsum) .toast { bottom: calc(148px + env(sa
     $('#exp-fallback').hidden = false; $('#exp-text').value = data;
     $('#exp-note').textContent = 'Le téléchargement n\'est pas disponible ici. Copiez le texte ci-dessous et collez-le dans un fichier.';
   }
+  function nativeDownload(data, filename, mime) {
+    try {
+      var blob = new Blob([data], { type: mime || 'application/octet-stream' });
+      var url = URL.createObjectURL(blob);
+      var a = document.createElement('a');
+      a.href = url; a.download = filename; a.style.display = 'none';
+      document.body.appendChild(a); a.click();
+      setTimeout(function () { document.body.removeChild(a); URL.revokeObjectURL(url); }, 1000);
+      return true;
+    } catch (e) { return false; }
+  }
   function exportFile(kind) {
     var note = $('#exp-note');
     var count = kind === 'pur' ? purchases.items.length : kind === 'csv' ? items.length : items.length + purchases.items.length + basket.items.length;
     if (!count) { note.textContent = 'Rien à exporter pour l\'instant.'; return; }
     var data = kind === 'csv' ? buildPricesCsv() : kind === 'pur' ? buildPurchasesCsv() : buildJson();
     var name = (kind === 'csv' ? 'prix-en-rayon-prix-' : kind === 'pur' ? 'prix-en-rayon-achats-' : 'prix-en-rayon-sauvegarde-') + today(0) + (kind === 'json' ? '.json' : '.csv');
-    if (!dl) { showFallback(data); return; }
+    var mime = kind === 'json' ? 'application/json' : 'text/csv;charset=utf-8';
     note.textContent = '';
-    dl.save({ filename: name, data: data }).then(function () {
-      note.textContent = 'Fichier exporté.';
-    }).catch(function (e) {
-      if (e && e.code === 'declined') note.textContent = 'Export annulé.';
-      else showFallback(data);
-    });
+    // 1. Essai téléchargement natif (Blob URL) — fonctionne dans la plupart des navigateurs
+    if (nativeDownload(kind === 'csv' ? '﻿' + data : data, name, mime)) {
+      note.textContent = 'Fichier téléchargé ✓';
+      return;
+    }
+    // 2. Essai capability downloads (artifact Claude)
+    if (dl) {
+      dl.save({ filename: name, data: data }).then(function () {
+        note.textContent = 'Fichier exporté ✓';
+      }).catch(function (e) {
+        if (e && e.code === 'declined') note.textContent = 'Export annulé.';
+        else showFallback(data);
+      });
+      return;
+    }
+    // 3. Fallback textarea + copier
+    showFallback(data);
   }
   $('#exp-csv').addEventListener('click', function () { exportFile('csv'); });
   $('#exp-pur').addEventListener('click', function () { exportFile('pur'); });
   $('#exp-json').addEventListener('click', function () { exportFile('json'); });
+  $('#exp-copy-json').addEventListener('click', function () {
+    var data = buildJson();
+    var done = function () { toast('JSON copié — collez-le dans un fichier .json'); };
+    try { navigator.clipboard.writeText(data).then(done).catch(function () { showFallback(data); }); } catch (e) { showFallback(data); }
+  });
   $('#exp-copy').addEventListener('click', function () {
     var t = $('#exp-text');
     var done = function () { toast('Texte copié'); };

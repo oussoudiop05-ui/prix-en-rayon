@@ -2,6 +2,19 @@
 
 Chaque version : nom, date, session Claude, description des modifications.
 
+## v10 — « Export JSON direct » (19 nov. 2026)
+Session : https://claude.ai/code/session_01EvniZ57G7WZk9pTAk6Ycce
+
+**Nouveautés**
+- Export JSON : téléchargement natif via Blob URL (fonctionne sur mobile sans passer par l'interface Claude).
+- Bouton « 📋 Copier le JSON » pour copier tout le JSON dans le presse-papiers et le coller dans un fichier ou un chat.
+- Fallback automatique : si le téléchargement échoue, le JSON s'affiche dans une zone de texte pour copier-coller.
+- Format du fichier : `prix-en-rayon-sauvegarde-AAAA-MM-JJ.json` contenant prix, achats et panier.
+
+**Usage**
+- Dans ⚙️ Réglages → « ⬇ Sauvegarde JSON » : télécharge le fichier directement.
+- Ou « 📋 Copier le JSON » : copier dans le presse-papiers, puis envoyer dans le chat pour analyse ou modification.
+
 ## v9 — « Un produit, plusieurs références » (8 nov. 2026)
 Session : https://claude.ai/code/session_01EvniZ57G7WZk9pTAk6Ycce
 
