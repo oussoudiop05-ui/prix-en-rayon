@@ -1,5 +1,20 @@
 # Journal des versions — Prix en rayon
 
+## v13 — « Légende confiance & correctif navigation mois » (19 nov. 2026)
+Session : https://claude.ai/code/session_01EvniZ57G7WZk9pTAk6Ycce
+
+**Prédictions — légende inline**
+- Une légende compacte s'affiche directement dans l'onglet Prédire sous le compteur de produits.
+- Elle explique les 3 niveaux de confiance des pastilles : ●●● (régulier = fiable), ●●○ (assez régulier), ●○○ (irrégulier = indicatif).
+- Deux indicateurs couleur : 🟢 dans les délais, 🔴 en retard.
+
+**Dépenses — correctif navigation mensuelle (suite)**
+- `buildBuckets()` utilisait `today(0)` pour calculer le début du mois au lieu de `agMonth` → KPIs, graphiques et calendrier affichaient toujours novembre même en naviguant vers octobre. Correction : `(agMonth || today(0).slice(0,7)) + '-01'`.
+- La bascule automatique sur «30 jours» (`spendAuto`) ne se déclenche plus quand l'utilisateur navigue manuellement vers un autre mois.
+- `spendAuto` est réinitialisé lors des clics ‹/› et lors du changement de période, pour débloquer la navigation libre.
+
+
+
 Chaque version : nom, date, session Claude, description des modifications.
 
 ## v12 — « Timeline prédictions & correctif Dépenses » (19 nov. 2026)
