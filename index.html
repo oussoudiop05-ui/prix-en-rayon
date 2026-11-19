@@ -96,27 +96,42 @@ details.more > .panel { padding: 12px; }
 .chip.pick.on { background: var(--ink); color: var(--bg); border-color: var(--ink); }
 .sugg { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
 .chip.pick.same { border-color: var(--accent); }
-/* ── Prédictions ── */
-.predict-info { font-size: 13px; color: var(--muted); margin: 0 0 12px; }
-.pred-card { border: 1.5px solid var(--line); border-radius: 10px; padding: 12px 14px; margin-bottom: 10px; background: var(--surface); }
-.pred-card.pred-overdue { border-color: var(--danger); background: var(--bad-bg); }
-.pred-card.pred-soon { border-color: var(--accent); }
-.pred-top { display: flex; justify-content: space-between; align-items: flex-start; gap: 8px; margin-bottom: 6px; }
-.pred-name { font-weight: 700; font-size: 15px; flex: 1; }
-.pred-when { font-size: 13px; font-weight: 700; white-space: nowrap; }
-.pred-when.pred-overdue { color: var(--danger); }
-.pred-when.pred-soon { color: var(--accent); }
-.pred-when.pred-later { color: var(--muted); }
-.pred-meta { display: flex; flex-wrap: wrap; gap: 6px 10px; font-size: 12px; color: var(--muted); align-items: center; margin-bottom: 6px; }
-.pred-place { font-style: italic; }
-.pred-interval, .pred-count { }
-.conf-high { color: var(--good, #2a8c4a); font-size: 13px; letter-spacing: 1px; }
-.conf-mid { color: var(--muted); font-size: 13px; letter-spacing: 1px; }
-.conf-low { color: var(--danger); font-size: 13px; letter-spacing: 1px; opacity: .7; }
-.pred-actions { margin-top: 8px; }
-.pred-cart { font-size: 13px; }
-.pred-in-cart { color: var(--good, #2a8c4a); font-weight: 700; margin-left: 4px; }
-/* ── /Prédictions ── */
+/* ── Prédictions timeline ── */
+.pred-info { font-size: 12px; color: var(--muted); margin: 0 0 10px; text-align: center; }
+/* Timeline scroll horizontal */
+.pred-timeline { display: flex; gap: 8px; overflow-x: auto; padding-bottom: 8px; scroll-snap-type: x mandatory; -webkit-overflow-scrolling: touch; }
+.pred-timeline::-webkit-scrollbar { height: 4px; }
+.pred-timeline::-webkit-scrollbar-thumb { background: var(--line); border-radius: 2px; }
+/* Colonne jour */
+.pred-col { min-width: 130px; max-width: 150px; flex-shrink: 0; display: flex; flex-direction: column; gap: 6px; scroll-snap-align: start; }
+.pred-col-head { text-align: center; padding: 5px 4px 6px; border-radius: 8px 8px 0 0; border-bottom: 2px solid var(--line); }
+.pred-col-head .pch-day { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .5px; color: var(--muted); }
+.pred-col-head .pch-date { font-size: 15px; font-weight: 800; color: var(--ink); }
+.pred-col-head.pred-today { background: var(--accent); }
+.pred-col-head.pred-today .pch-day, .pred-col-head.pred-today .pch-date { color: #fff; }
+.pred-col-head.pred-week { background: var(--surface); border-bottom-color: var(--accent); }
+.pred-col-head.pred-week .pch-day { color: var(--accent); }
+/* Carte produit */
+.pred-chip { background: var(--surface); border: 1.5px solid var(--line); border-radius: 8px; padding: 8px 10px; font-size: 13px; cursor: default; }
+.pred-chip.pred-soon { border-color: var(--accent); }
+.pred-chip-name { font-weight: 700; line-height: 1.25; margin-bottom: 3px; }
+.pred-chip-sub { font-size: 11px; color: var(--muted); display: flex; gap: 6px; flex-wrap: wrap; align-items: center; }
+.pred-chip-cart { all: unset; cursor: pointer; font-size: 11px; color: var(--accent); font-weight: 700; padding: 2px 5px; border: 1px solid var(--accent); border-radius: 5px; margin-top: 5px; display: inline-block; }
+.pred-chip-cart:active { opacity: .7; }
+.pred-chip-incart { font-size: 11px; color: var(--good, #2a8c4a); font-weight: 700; margin-top: 5px; display: block; }
+/* Ligne retard */
+.pred-overdue-row { background: var(--bad-bg); border: 1.5px solid var(--danger); border-radius: 10px; padding: 10px 12px; margin-bottom: 10px; }
+.pred-overdue-title { font-size: 12px; font-weight: 700; color: var(--danger); text-transform: uppercase; letter-spacing: .5px; margin-bottom: 8px; }
+.pred-overdue-list { display: flex; flex-direction: column; gap: 6px; }
+.pred-overdue-item { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+.pred-overdue-name { font-size: 13px; font-weight: 700; flex: 1; }
+.pred-overdue-delay { font-size: 12px; color: var(--danger); white-space: nowrap; }
+.pred-overdue-actions { display: flex; gap: 6px; align-items: center; }
+/* Conf dots */
+.conf-high { color: var(--good, #2a8c4a); font-size: 11px; letter-spacing: 1px; }
+.conf-mid { color: var(--muted); font-size: 11px; letter-spacing: 1px; }
+.conf-low { color: var(--danger); font-size: 11px; letter-spacing: 1px; opacity: .7; }
+/* ── /Prédictions timeline ── */
 .invalid { border-color: var(--danger) !important; background: var(--bad-bg) !important; }
 .req { color: var(--danger); }
 .imp-line.err { border-color: var(--danger); background: var(--bad-bg); }
@@ -2730,7 +2745,7 @@ body:has(#view-cart:not([hidden]) .cartsum) .toast { bottom: calc(148px + env(sa
     if (spendPeriod === 'all') return true;
     var d = p.date || '';
     if (spendPeriod === 'range') return (!rangeFrom || d >= rangeFrom) && (!rangeTo || d <= rangeTo);
-    return spendPeriod === 'month' ? d.slice(0, 7) === today(0).slice(0, 7) : d >= today(30);
+    return spendPeriod === 'month' ? d.slice(0, 7) === (agMonth || today(0).slice(0, 7)) : d >= today(30);
   }
   function breakdown(title, map, total, opt) {
     opt = opt || {};
@@ -3910,10 +3925,10 @@ body:has(#view-cart:not([hidden]) .cartsum) .toast { bottom: calc(148px + env(sa
     var box = $('#predict-body');
     if (mode === 'pending') { box.innerHTML = ''; return; }
     var MIN_PURCHASES = 3;
-    var now = Date.now();
-    var horizonMs = predictHorizon * 86400000;
+    var nowTs = Date.now();
+    var todayStr = today(0);
 
-    // Regroup purchases by (name + place) normalized key
+    // ── Modèle (inchangé) ──
     var groups = {};
     purchases.items.forEach(function (p) {
       var key = (p.name || '').toLowerCase().trim() + '|' + (p.place || '').toLowerCase().trim();
@@ -3923,75 +3938,39 @@ body:has(#view-cart:not([hidden]) .cartsum) .toast { bottom: calc(148px + env(sa
     });
 
     var suggestions = [];
-
     Object.values(groups).forEach(function (g) {
       if (g.dates.length < MIN_PURCHASES) return;
-
-      // Sort chronologically
       var dates = g.dates.slice().sort(function (a, b) { return a - b; });
-
-      // Compute intervals between consecutive purchases (in days)
       var intervals = [];
-      for (var i = 1; i < dates.length; i++) {
-        intervals.push((dates[i] - dates[i - 1]) / 86400000);
-      }
-
-      // Weighted moving average (more recent intervals weighted more)
+      for (var i = 1; i < dates.length; i++) intervals.push((dates[i] - dates[i - 1]) / 86400000);
       var weightedSum = 0, weightTotal = 0;
-      intervals.forEach(function (iv, idx) {
-        var w = idx + 1; // weight proportional to position (most recent = highest)
-        weightedSum += iv * w;
-        weightTotal += w;
-      });
+      intervals.forEach(function (iv, idx) { var w = idx + 1; weightedSum += iv * w; weightTotal += w; });
       var avgInterval = weightTotal > 0 ? weightedSum / weightTotal : 0;
       if (avgInterval <= 0) return;
-
-      // Variance → confidence
       var variance = 0;
       intervals.forEach(function (iv) { variance += Math.pow(iv - avgInterval, 2); });
       variance /= intervals.length;
-      var stdDev = Math.sqrt(variance);
-      var cv = stdDev / avgInterval; // coefficient of variation
-
-      // High variance = occasional/gift item → exclude (cv > 1 means very irregular)
+      var cv = Math.sqrt(variance) / avgInterval;
       if (cv > 1.0) return;
-
       var lastDate = dates[dates.length - 1];
-      var daysSinceLast = (now - lastDate) / 86400000;
+      var daysSinceLast = (nowTs - lastDate) / 86400000;
       var daysUntilNext = avgInterval - daysSinceLast;
-
-      // Only show items expected within the selected horizon
-      if (daysUntilNext > predictHorizon) return;
-
-      // Urgency: 0 (overdue) → 1 (just predicted)
-      var urgency = daysUntilNext <= 0 ? 0 : daysUntilNext / predictHorizon;
-
-      // Confidence score (0-100): penalize high cv
+      // Pour le timeline : inclure même légèrement après l'horizon (pour la semaine 14j)
+      if (daysUntilNext > predictHorizon + (predictHorizon === 14 ? 6 : 0)) return;
       var conf = Math.round(Math.max(0, Math.min(100, (1 - cv) * 100)));
-
-      // Find matching price entry for "add to cart" capability
       var priceEntry = null;
-      if (g.itemId) {
-        priceEntry = items.find(function (x) { return x.id === g.itemId; });
-      }
-      if (!priceEntry) {
-        // Fuzzy match by name + place
-        priceEntry = items.find(function (x) {
-          return x.name.toLowerCase().trim() === g.name.toLowerCase().trim() &&
-                 x.place.toLowerCase().trim() === g.place.toLowerCase().trim();
-        });
-      }
-
+      if (g.itemId) priceEntry = items.find(function (x) { return x.id === g.itemId; });
+      if (!priceEntry) priceEntry = items.find(function (x) {
+        return x.name.toLowerCase().trim() === g.name.toLowerCase().trim() &&
+               x.place.toLowerCase().trim() === g.place.toLowerCase().trim();
+      });
       suggestions.push({
         name: g.name, place: g.place, cat: g.cat,
-        avgInterval: avgInterval, daysSinceLast: daysSinceLast,
-        daysUntilNext: daysUntilNext, urgency: urgency,
-        conf: conf, count: dates.length,
-        priceEntry: priceEntry || null
+        avgInterval: avgInterval, daysUntilNext: daysUntilNext,
+        conf: conf, count: dates.length, priceEntry: priceEntry || null
       });
     });
 
-    // Sort: overdue first, then by urgency ascending (most urgent first)
     suggestions.sort(function (a, b) { return a.daysUntilNext - b.daysUntilNext; });
 
     if (!suggestions.length) {
@@ -3999,40 +3978,97 @@ body:has(#view-cart:not([hidden]) .cartsum) .toast { bottom: calc(148px + env(sa
       return;
     }
 
-    var html = '<p class="predict-info">Basé sur vos habitudes d\'achat — ' + suggestions.length + ' produit' + (suggestions.length > 1 ? 's' : '') + ' prédit' + (suggestions.length > 1 ? 's' : '') + ' dans les ' + predictHorizon + ' prochains jours.</p>';
-
-    suggestions.forEach(function (s) {
-      var overdue = s.daysUntilNext <= 0;
-      var daysLabel = overdue
-        ? 'En retard de ' + Math.round(-s.daysUntilNext) + ' j'
-        : (Math.round(s.daysUntilNext) <= 1 ? 'Demain ou aujourd\'hui' : 'Dans ' + Math.round(s.daysUntilNext) + ' j');
-      var urgClass = overdue ? 'pred-overdue' : (s.urgency < 0.3 ? 'pred-soon' : 'pred-later');
+    // ── Helper : chip HTML ──
+    function chipHtml(s) {
       var confClass = s.conf >= 70 ? 'conf-high' : (s.conf >= 40 ? 'conf-mid' : 'conf-low');
       var confLabel = s.conf >= 70 ? '●●●' : (s.conf >= 40 ? '●●○' : '●○○');
-      var confTitle = 'Confiance ' + s.conf + '% (régularité)';
-      var cartBtn = s.priceEntry
-        ? '<button type="button" class="btn small pred-cart" data-pred-id="' + s.priceEntry.id + '" aria-label="Ajouter au panier">🛒 Panier</button>'
-        : '';
-      var inCart = s.priceEntry && basket.items.some(function (x) { return x.itemId === s.priceEntry.id; });
-      var cartMark = inCart ? ' <span class="pred-in-cart" title="Déjà dans le panier">✓</span>' : '';
       var intervalLabel = s.avgInterval >= 7
-        ? 'tous les ~' + Math.round(s.avgInterval / 7) + ' sem.'
-        : 'tous les ~' + Math.round(s.avgInterval) + ' j';
-
-      html += '<div class="pred-card ' + urgClass + '">' +
-        '<div class="pred-top">' +
-          '<div class="pred-name">' + esc(s.name) + cartMark + '</div>' +
-          '<div class="pred-when ' + urgClass + '">' + daysLabel + '</div>' +
+        ? '~' + Math.round(s.avgInterval / 7) + ' sem.'
+        : '~' + Math.round(s.avgInterval) + ' j';
+      var inCart = s.priceEntry && basket.items.some(function (x) { return x.itemId === s.priceEntry.id; });
+      var cartHtml = inCart
+        ? '<span class="pred-chip-incart">✓ Panier</span>'
+        : (s.priceEntry ? '<button type="button" class="pred-chip-cart" data-pred-id="' + s.priceEntry.id + '">🛒 Panier</button>' : '');
+      return '<div class="pred-chip' + (s.daysUntilNext <= 1 && s.daysUntilNext > 0 ? ' pred-soon' : '') + '">' +
+        '<div class="pred-chip-name">' + esc(s.name) + '</div>' +
+        '<div class="pred-chip-sub">' +
+          '<span>' + esc(s.place) + '</span>' +
+          '<span>' + intervalLabel + '</span>' +
+          '<span class="' + confClass + '">' + confLabel + '</span>' +
         '</div>' +
-        '<div class="pred-meta">' +
-          '<span class="pred-place">' + esc(s.place) + '</span>' +
-          '<span class="pred-interval">' + intervalLabel + '</span>' +
-          '<span class="pred-count">' + s.count + ' achat' + (s.count > 1 ? 's' : '') + '</span>' +
-          '<span class="' + confClass + '" title="' + confTitle + '" aria-label="' + confTitle + '">' + confLabel + '</span>' +
-        '</div>' +
-        (cartBtn ? '<div class="pred-actions">' + cartBtn + '</div>' : '') +
+        cartHtml +
       '</div>';
-    });
+    }
+
+    var html = '<p class="pred-info">Basé sur vos habitudes · ' + suggestions.length + ' produit' + (suggestions.length > 1 ? 's' : '') + ' prévu' + (suggestions.length > 1 ? 's' : '') + '</p>';
+
+    // ── Retards (daysUntilNext < 0) → ligne en haut ──
+    var overdue = suggestions.filter(function (s) { return s.daysUntilNext <= 0; });
+    if (overdue.length) {
+      html += '<div class="pred-overdue-row">' +
+        '<div class="pred-overdue-title">⚠ En retard — ' + overdue.length + ' produit' + (overdue.length > 1 ? 's' : '') + '</div>' +
+        '<div class="pred-overdue-list">' +
+        overdue.map(function (s) {
+          var confClass = s.conf >= 70 ? 'conf-high' : (s.conf >= 40 ? 'conf-mid' : 'conf-low');
+          var confLabel = s.conf >= 70 ? '●●●' : (s.conf >= 40 ? '●●○' : '●○○');
+          var inCart = s.priceEntry && basket.items.some(function (x) { return x.itemId === s.priceEntry.id; });
+          var cartHtml = inCart
+            ? '<span class="pred-chip-incart">✓</span>'
+            : (s.priceEntry ? '<button type="button" class="pred-chip-cart" data-pred-id="' + s.priceEntry.id + '">🛒</button>' : '');
+          return '<div class="pred-overdue-item">' +
+            '<span class="pred-overdue-name">' + esc(s.name) + ' <span class="' + confClass + '">' + confLabel + '</span></span>' +
+            '<span class="pred-overdue-delay">' + Math.round(-s.daysUntilNext) + ' j de retard</span>' +
+            '<div class="pred-overdue-actions">' + cartHtml + '</div>' +
+          '</div>';
+        }).join('') +
+        '</div></div>';
+    }
+
+    // ── Timeline : jours ou semaines ──
+    var upcoming = suggestions.filter(function (s) { return s.daysUntilNext > 0; });
+
+    if (predictHorizon <= 7) {
+      // Vue jour par jour
+      html += '<div class="pred-timeline">';
+      for (var d = 0; d <= predictHorizon; d++) {
+        var dStr = d === 0 ? todayStr : addDays(todayStr, d);
+        var dayItems = upcoming.filter(function (s) { return Math.round(s.daysUntilNext) === d || (d === 0 && s.daysUntilNext > 0 && s.daysUntilNext < 0.5); });
+        // On n'affiche pas les colonnes vides après la première
+        if (d > 0 && !dayItems.length) continue;
+        var isToday = d === 0;
+        var dLabel = isToday ? 'Aujourd\'hui' : (d === 1 ? 'Demain' : new Date(dStr + 'T12:00:00').toLocaleDateString('fr-FR', { weekday: 'short' }));
+        var dNum = new Date(dStr + 'T12:00:00').toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' });
+        html += '<div class="pred-col">' +
+          '<div class="pred-col-head' + (isToday ? ' pred-today' : '') + '">' +
+            '<div class="pch-day">' + esc(dLabel) + '</div>' +
+            '<div class="pch-date">' + esc(dNum) + '</div>' +
+          '</div>' +
+          dayItems.map(chipHtml).join('') +
+        '</div>';
+      }
+      html += '</div>';
+    } else {
+      // 14 jours → groupement par semaine (S1 = J0–J6, S2 = J7–J13)
+      html += '<div class="pred-timeline">';
+      for (var w = 0; w < 2; w++) {
+        var wStart = w * 7, wEnd = wStart + 6;
+        var wStartStr = w === 0 ? todayStr : addDays(todayStr, wStart);
+        var wEndStr = addDays(todayStr, wEnd);
+        var wItems = upcoming.filter(function (s) { return Math.round(s.daysUntilNext) >= wStart && Math.round(s.daysUntilNext) <= wEnd; });
+        if (!wItems.length) continue;
+        var wLabel = w === 0 ? 'Cette semaine' : 'Semaine prochaine';
+        var wRange = new Date(wStartStr + 'T12:00:00').toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' }) + '–' +
+                     new Date(wEndStr + 'T12:00:00').toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' });
+        html += '<div class="pred-col" style="min-width:160px">' +
+          '<div class="pred-col-head pred-week">' +
+            '<div class="pch-day">' + esc(wLabel) + '</div>' +
+            '<div class="pch-date" style="font-size:12px;font-weight:600">' + esc(wRange) + '</div>' +
+          '</div>' +
+          wItems.map(chipHtml).join('') +
+        '</div>';
+      }
+      html += '</div>';
+    }
 
     box.innerHTML = html;
   }
