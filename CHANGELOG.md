@@ -1,5 +1,19 @@
 # Journal des versions — Prix en rayon
 
+## v14 — « Navigation libre par mois & tickets groupés » (19 nov. 2026)
+Session : https://claude.ai/code/session_01EvniZ57G7WZk9pTAk6Ycce
+
+**Dépenses — navigation mensuelle libre**
+- Suppression du filtre «30 jours» : il reste désormais 3 périodes uniquement — «Par mois», «Tout» et «📅 Dates».
+- «Par mois» devient un vrai navigateur mensuel : on peut reculer librement vers n'importe quel mois passé, même s'il ne contient aucun achat. Un mois vide affiche «Aucune dépense ce mois-ci» sans rediriger automatiquement.
+- La flèche ‹ (mois précédent) n'est plus verrouillée au premier mois ayant des achats : navigation libre sans plancher.
+- Suppression de la bascule automatique sur «30 jours» (`spendAuto`) : elle ne se déclenchait plus que sur les mois vides et provoquait des comportements inattendus.
+
+**Dépenses — affichage des tickets groupés (Leclerc 7 nov.)**
+- Correction de l'affichage dans le calendrier des dépenses pour les achats enregistrés en format «panier» (via caisse).
+- Avant : le détail du jour affichait des lignes vides car le code lisait `p.name` et `p.count`, absents du format groupé `{items:[]}`.
+- Maintenant : si l'achat contient un tableau `items`, les articles sont affichés depuis `items[].name`, `items[].qty` et `items[].total`, avec un résumé «… et N articles» si le ticket dépasse 8 lignes.
+
 ## v13 — « Légende confiance & correctif navigation mois » (19 nov. 2026)
 Session : https://claude.ai/code/session_01EvniZ57G7WZk9pTAk6Ycce
 

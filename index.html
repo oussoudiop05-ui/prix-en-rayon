@@ -154,7 +154,7 @@ label.btn.small { min-height: 38px; padding: 0 12px; font-size: 14px; border-wid
 .kpi .s { font-size: 13px; color: var(--muted); overflow-wrap: anywhere; }
 .chartcard { display: grid; gap: 8px; padding: 12px; border: 1.5px solid var(--line); border-radius: 10px; background: var(--surface); }
 .chartcard .seg { width: 100%; grid-template-columns: repeat(3, 1fr); }
-#spend-period { grid-template-columns: repeat(4, 1fr); }
+#spend-period { grid-template-columns: repeat(3, 1fr); }
 .seg.two { grid-template-columns: 1fr 1fr; }
 .rangebox { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
 .agh { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
@@ -615,8 +615,7 @@ body:has(#view-cart:not([hidden]) .cartsum) .toast { bottom: calc(148px + env(sa
   <section id="view-spend" class="panel" role="tabpanel" aria-labelledby="tab-spend" hidden>
     <div class="actions-row"><button type="button" class="btn small lot-open">💶 Ajouter un achat global (montant)</button></div>
     <div class="seg" id="spend-period" role="group" aria-label="Période">
-      <button type="button" data-p="month" aria-pressed="true">Ce mois</button>
-      <button type="button" data-p="30" aria-pressed="false">30 jours</button>
+      <button type="button" data-p="month" aria-pressed="true">Par mois</button>
       <button type="button" data-p="all" aria-pressed="false">Tout</button>
       <button type="button" data-p="range" aria-pressed="false">📅 Dates</button>
     </div>
@@ -2773,7 +2772,7 @@ body:has(#view-cart:not([hidden]) .cartsum) .toast { bottom: calc(148px + env(sa
     list.forEach(function (p) { var d = p.date || today(0); tot[d] = (tot[d] || 0) + ptotal(p); (byDay[d] = byDay[d] || []).push(p); });
     Object.keys(tot).forEach(function (d) { tot[d] = cents(tot[d]); if (tot[d] > max) max = tot[d]; });
     var m0 = B.start.slice(0, 7), m1 = B.end.slice(0, 7);
-    if (!agMonth || agMonth < m0 || agMonth > m1) { agMonth = m1; agSel = null; }
+    if (!agMonth) { agMonth = m1; agSel = null; } else if (agMonth > m1) { agMonth = m1; agSel = null; }
     var y = +agMonth.slice(0, 4), mo = +agMonth.slice(5, 7), nd = new Date(y, mo, 0).getDate(), off = (new Date(y, mo - 1, 1).getDay() + 6) % 7, now = today(0);
     var mTotal = 0; Object.keys(tot).forEach(function (d) { if (d.slice(0, 7) === agMonth) mTotal += tot[d]; });
     var mName = new Date(y, mo - 1, 1).toLocaleDateString('fr-FR', { month: 'long', year: 'numeric' });
@@ -2781,7 +2780,7 @@ body:has(#view-cart:not([hidden]) .cartsum) .toast { bottom: calc(148px + env(sa
       var ds = Object.keys(tot).filter(function (d) { return d.slice(0, 7) === agMonth; }).sort();
       agSel = ds.length ? ds[ds.length - 1] : null;
     }
-    var h = '<div class="agh"><button type="button" class="ib sm" data-act="ag-prev" aria-label="Mois précédent"' + (agMonth <= m0 ? ' disabled' : '') + '>‹</button>' +
+    var h = '<div class="agh"><button type="button" class="ib sm" data-act="ag-prev" aria-label="Mois précédent">‹</button>' +
       '<div class="t">' + esc(mName) + '<span>' + esc(eur.format(cents(mTotal))) + ' dépensés</span></div>' +
       '<button type="button" class="ib sm" data-act="ag-next" aria-label="Mois suivant"' + (agMonth >= m1 ? ' disabled' : '') + '>›</button></div>' +
       '<div class="agg" role="grid" aria-label="Dépenses de ' + esc(mName) + '">' + ['L', 'M', 'M', 'J', 'V', 'S', 'D'].map(function (w) { return '<span class="agw" role="columnheader">' + w + '</span>'; }).join('');
@@ -2796,7 +2795,14 @@ body:has(#view-cart:not([hidden]) .cartsum) .toast { bottom: calc(148px + env(sa
     if (agSel && byDay[agSel]) {
       var ps = byDay[agSel], long = new Date(agSel + 'T12:00:00').toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long' });
       h += '<div class="agt">' + esc(long.charAt(0).toUpperCase() + long.slice(1)) + ' · ' + esc(eur.format(tot[agSel])) + '</div><ul class="agl">' +
-        ps.slice(0, 12).map(function (p) { return '<li><span>' + esc(p.name) + ((p.count || 1) > 1 ? ' × ' + p.count : '') + (p.place ? ' · ' + esc(p.place) : '') + '</span><span>' + esc(eur.format(ptotal(p))) + '</span></li>'; }).join('') +
+        ps.slice(0, 12).map(function (p) {
+          if (p.items && Array.isArray(p.items)) {
+            return p.items.slice(0, 8).map(function (it) {
+              return '<li><span>' + esc(it.name) + (it.qty > 1 ? ' × ' + it.qty : '') + (p.place ? ' · ' + esc(p.place) : '') + '</span><span>' + esc(eur.format(it.total)) + '</span></li>';
+            }).join('') + (p.items.length > 8 ? '<li><span>… et ' + (p.items.length - 8) + ' articles</span><span></span></li>' : '');
+          }
+          return '<li><span>' + esc(p.name) + ((p.count || 1) > 1 ? ' × ' + p.count : '') + (p.place ? ' · ' + esc(p.place) : '') + '</span><span>' + esc(eur.format(ptotal(p))) + '</span></li>';
+        }).join('') +
         (ps.length > 12 ? '<li><span>… et ' + (ps.length - 12) + ' autres</span><span></span></li>' : '') + '</ul>';
     } else h += '<p class="scan-note">' + (agSel ? 'Rien dépensé ce jour-là.' : 'Aucune dépense ce mois-ci. Touchez un jour pour voir son détail.') + '</p>';
     return h + '</div>';
@@ -2948,9 +2954,8 @@ body:has(#view-cart:not([hidden]) .cartsum) .toast { bottom: calc(148px + env(sa
       return String(b.date || '').localeCompare(String(a.date || '')) || (b.createdAt || 0) - (a.createdAt || 0);
     });
     if (!list.length) {
-      if (spendPeriod === 'month' && !spendAuto && !agMonth) { spendAuto = true; var b30 = $('#spend-period button[data-p="30"]'); if (b30) { b30.click(); return; } }
-      box.innerHTML = '<div class="empty"><h2>Rien sur cette période</h2><p>Vos ' + purchases.items.length + ' achats sont bien enregistrés, mais aucun ne tombe dans cette période.</p>' +
-        '<div class="actions-row"><button type="button" class="btn small primary" data-sp="30">Voir les 30 derniers jours</button><button type="button" class="btn small" data-sp="all">Tout afficher</button></div></div>';
+      box.innerHTML = '<div class="empty"><h2>Aucune dépense ce mois-ci</h2><p>Vos ' + purchases.items.length + ' achats sont bien enregistrés, mais aucun ne tombe sur ce mois.</p>' +
+        '<div class="actions-row"><button type="button" class="btn small" data-sp="all">Tout afficher</button></div></div>';
       return;
     }
     var total = 0, saved = 0, byPlace = {}, byCat = {}, byArt = {}, byDow = { Lundi: 0, Mardi: 0, Mercredi: 0, Jeudi: 0, Vendredi: 0, Samedi: 0, Dimanche: 0 }, trips = {};
