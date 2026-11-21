@@ -1,5 +1,16 @@
 # Journal des versions — Prix en rayon
 
+## v15 — « Panier : article inconnu mieux géré » (21 nov. 2026)
+Session : https://claude.ai/code/session_01EvniZ57G7WZk9pTAk6Ycce
+
+**Panier — ajout d'un article inconnu**
+- Quand un article inconnu (sans correspondance dans le catalogue) est ajouté via le champ panier, le panel ✏️ s'ouvre automatiquement pour permettre de renseigner le lieu et le prix immédiatement.
+- Le toast indique désormais clairement : «Ajouté sans prix — renseignez le prix et le lieu ci-dessous.»
+
+**Panier — liaison article inconnu → produit du catalogue**
+- Correction de `cartAfterSave` : quand un article était ajouté en tant qu'inconnu (sans prix) puis complété via le formulaire «Ajouter», l'app doublait la quantité ou créait un doublon dans le panier.
+- Maintenant : si un article sans prix existe déjà dans le panier avec le même nom, il est mis à jour avec `itemId`, `price`, `place` etc. sans modifier la quantité ni créer d'entrée supplémentaire.
+
 ## v14 — « Navigation libre par mois & tickets groupés » (19 nov. 2026)
 Session : https://claude.ai/code/session_01EvniZ57G7WZk9pTAk6Ycce
 

@@ -1011,7 +1011,14 @@ body:has(#view-cart:not([hidden]) .cartsum) .toast { bottom: calc(148px + env(sa
   function cartAfterSave(rec, id) {
     var it = id ? items.find(function (x) { return x.id === id; }) : null;
     if (!it) it = items.find(function (x) { return x.createdAt === rec.createdAt && x.name === rec.name && (x.place || '') === (rec.place || ''); }) || items.find(function (x) { return x.name === rec.name && (x.place || '') === (rec.place || ''); });
-    return it ? addToBasket(it, it.name, 1, null, false) : Promise.resolve(false);
+    if (!it) return Promise.resolve(false);
+    // Si un article sans prix (inconnu) est déjà dans le panier avec le même nom, on le lie sans toucher la quantité
+    var pending = basket.items.find(function (l) { return !l.itemId && norm(l.name) === norm(it.name); });
+    if (pending) {
+      return basket.patch(pending.id, { itemId: it.id, name: it.name, brand: it.brand || '', place: it.place || '', cat: it.cat || '', price: it.price, promo: !!it.promo, regularPrice: it.promo && it.regularPrice != null ? it.regularPrice : null })
+        .then(function () { return true; }).catch(function () { return false; });
+    }
+    return addToBasket(it, it.name, 1, null, false);
   }
   function putItem(rec, id) {
     if (mode === 'db' && col) { return (id ? col.doc(id) : col.doc()).set(rec); }
@@ -1897,7 +1904,17 @@ body:has(#view-cart:not([hidden]) .cartsum) .toast { bottom: calc(148px + env(sa
     var count = Math.max(1, parseInt($('#cart-count').value, 10) || 1);
     var it = suggestFor(name), dv = $('#cart-deal').value;
     addToBasket(it, it ? it.name : name, count, dv !== '' && dv !== 'custom' ? DEAL_PRESETS[+dv] : null, dv === 'custom').then(function (ok) {
-      if (ok) { $('#cart-name').value = ''; $('#cart-count').value = '1'; $('#cart-deal').value = ''; $('#cart-name').focus(); toast(it ? 'Au panier : ' + it.name + (it.place ? ' · ' + it.place : '') : 'Ajouté sans prix, à compléter'); }
+      if (ok) {
+        $('#cart-name').value = ''; $('#cart-count').value = '1'; $('#cart-deal').value = ''; $('#cart-name').focus();
+        if (it) {
+          toast('Au panier : ' + it.name + (it.place ? ' · ' + it.place : ''));
+        } else {
+          // Article inconnu : ouvrir auto le panel ✏️ pour compléter lieu/prix
+          var added = basket.items.find(function (l) { return !l.itemId && norm(l.name) === norm(name); });
+          if (added) { openEdit = added.id; openDeal = null; openRefs = null; renderCart(); }
+          toast('Ajouté sans prix — renseignez le prix et le lieu ci-dessous.');
+        }
+      }
     });
   });
 
