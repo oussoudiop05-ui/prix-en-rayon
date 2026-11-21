@@ -1769,10 +1769,16 @@ body:has(#view-cart:not([hidden]) .cartsum) .toast { bottom: calc(148px + env(sa
 
   function editPanel(l) {
     if (openEdit !== l.id) return '';
+    var units = ['g','kg','ml','cl','L','u'];
+    var unitLabels = { g:'g', kg:'kg', ml:'ml', cl:'cl', L:'L', u:'pièce' };
+    var curUnit = l.unit || 'g';
+    var unitSel = units.map(function(u){ return '<option value="' + u + '"' + (u === curUnit ? ' selected' : '') + '>' + unitLabels[u] + '</option>'; }).join('');
+    var qtyRow = !l.itemId ? '<div class="row2"><div class="field"><label for="bp-qty">Contenance</label><input type="text" id="bp-qty" inputmode="decimal" placeholder="ex. 500" autocomplete="off" value="' + esc(l.qty ? String(l.qty).replace('.', ',') : '') + '"></div><div class="field"><label for="bp-unit">Unité</label><select id="bp-unit">' + unitSel + '</select></div></div>' : '';
     return '<div class="buy-panel"><p class="why-t">Corriger cette ligne</p>' +
       '<div class="row2"><div class="field"><label for="bp-place">Lieu</label><input type="text" id="bp-place" list="places" autocomplete="off" value="' + esc(l.place || '') + '"></div>' +
       '<div class="field"><label for="bp-price">Prix (€, par article)</label><input type="text" id="bp-price" inputmode="decimal" autocomplete="off" value="' + esc(l.price != null ? String(l.price).replace('.', ',') : '') + '"></div></div>' +
-      '<div class="field"><label for="bp-count">Nombre</label><input type="text" id="bp-count" inputmode="numeric" autocomplete="off" value="' + esc(l.count || 1) + '"></div>' +
+      qtyRow +
+      '<div class="field"><label for="bp-count">Nombre d\'articles</label><input type="text" id="bp-count" inputmode="numeric" autocomplete="off" value="' + esc(l.count || 1) + '"></div>' +
       '<p class="msg" id="bp-msg" role="alert"></p>' +
       '<div class="actions-row"><button type="button" class="btn small primary" data-act="bk-save">OK</button><button type="button" class="linkbtn" data-act="bk-close">Fermer</button></div></div>';
   }
@@ -1838,7 +1844,9 @@ body:has(#view-cart:not([hidden]) .cartsum) .toast { bottom: calc(148px + env(sa
       html += '<div class="ghead"><div class="gt">' + esc(pl || 'Lieu à préciser') + ' <span class="mp w" title="Panier chez ce lieu">' + esc(eur.format(st)) + ' (' + cnt + ')</span>' + (pt.n ? '<span class="mp g" title="Articles pris">' + esc(eur.format(pt.t)) + ' (' + pt.n + ')</span>' : '') + '</div>' +
         '<button type="button" class="ib ok" data-act="bk-vplace" data-place="' + esc(pl) + '" aria-label="Payé' + (pl ? ' chez ' + esc(pl) : '') + '" title="Payé' + (pl ? ' chez ' + esc(pl) : '') + '">' + ICON('check') + '</button></div>';
       html += '<ul class="list">' + ls.map(function (l) {
-        var meta = [l.price != null ? eur.format(l.price) + ((l.count || 1) > 1 ? ' pièce' : '') : 'Prix à saisir', l.promo ? 'promo' : '', l.brand, l.date && l.date !== today(0) ? 'du ' + fmtDate(l.date) : ''].filter(Boolean).join(' · ');
+        var upLabel = '';
+        if (!l.itemId && l.price != null && l.qty && l.unit) { var uc = compute(l.price, l.qty, l.unit, null); if (uc.unitPrice != null) upLabel = eur.format(uc.unitPrice) + '/' + GS[uc.group]; }
+        var meta = [l.price != null ? eur.format(l.price) + (l.qty && l.unit && l.unit !== 'u' ? ' · ' + l.qty + ' ' + l.unit : ((l.count || 1) > 1 ? ' pièce' : '')) : 'Prix à saisir', upLabel, l.promo ? 'promo' : '', l.brand, l.date && l.date !== today(0) ? 'du ' + fmtDate(l.date) : ''].filter(Boolean).join(' · ');
         var dc = dealCalc(l.price, l.count || 1, l.deal), dn = l.deal && l.deal.n >= 2 ? l.deal.n - (l.count || 1) : 0;
         var dealRow = l.deal ? '<p class="dealrow"><span class="chip promo">' + ICON('tag') + esc(dealLabel(l.deal)) + (dc.saved > 0 ? ' · −' + esc(eur.format(dc.saved)) : '') + '</span>' +
           (dn > 0 && l.price != null ? '<button type="button" class="chip pick" data-act="bk-inc">+' + dn + ' pour la promo</button>' : '') + '</p>' : '';
@@ -1983,8 +1991,15 @@ body:has(#view-cart:not([hidden]) .cartsum) .toast { bottom: calc(148px + env(sa
       if (!place) { msg.textContent = 'Indiquez le lieu d\'achat.'; $('#bp-place').focus(); return; }
       if (!(count >= 1)) { msg.textContent = 'Indiquez un nombre d\'articles (1 ou plus).'; $('#bp-count').focus(); return; }
       var same = l.price === price && (l.place || '') === place;
+      var patch = { place: place, price: price, count: count, promo: same ? !!l.promo : false, regularPrice: same ? (l.regularPrice != null ? l.regularPrice : null) : null };
+      // Pour les articles sans produit lié, enregistrer aussi contenance et unité
+      if (!l.itemId) {
+        var qtyEl = $('#bp-qty'), unitEl = $('#bp-unit');
+        if (qtyEl) { var qv = num(qtyEl.value); if (qv != null && qv > 0) patch.qty = qv; }
+        if (unitEl) patch.unit = unitEl.value;
+      }
       openEdit = null;
-      basket.patch(id, { place: place, price: price, count: count, promo: same ? !!l.promo : false, regularPrice: same ? (l.regularPrice != null ? l.regularPrice : null) : null })
+      basket.patch(id, patch)
         .then(function () { toast('Ligne corrigée'); }).catch(function () { toast('Modification refusée.'); });
       renderAll();
     }
